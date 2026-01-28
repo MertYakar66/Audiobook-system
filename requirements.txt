@@ -1,0 +1,33 @@
+# Audiobook Generation System - Python Dependencies
+
+# PDF Processing
+PyMuPDF>=1.23.0          # PDF text extraction (fitz)
+pdfplumber>=0.10.0       # Alternative PDF extraction
+
+# Text Processing
+nltk>=3.8.0              # Natural language processing
+regex>=2023.0.0          # Advanced regex patterns
+chardet>=5.0.0           # Character encoding detection
+ftfy>=6.1.0              # Fix text encoding issues
+
+# Audio Processing
+pydub>=0.25.0            # Audio manipulation
+mutagen>=1.47.0          # Audio metadata handling
+
+# TTS - Audiblez with Kokoro
+audiblez>=0.1.0          # Main TTS engine (installs kokoro as dependency)
+
+# Audiobook Creation
+ffmpeg-python>=0.2.0     # FFmpeg wrapper for m4b creation
+
+# Utilities
+click>=8.1.0             # CLI framework
+rich>=13.0.0             # Beautiful terminal output
+pyyaml>=6.0.0            # Configuration files
+tqdm>=4.66.0             # Progress bars
+Pillow>=10.0.0           # Image processing (covers)
+requests>=2.31.0         # HTTP requests (for cover downloads)
+
+# Optional: For advanced chapter detection
+ebooklib>=0.18           # EPUB support
+beautifulsoup4>=4.12.0   # HTML parsing

@@ -1,0 +1,36 @@
+version: "3.8"
+
+# Audiobook System - Docker Compose
+# Audiobookshelf for library management and playback
+
+services:
+  audiobookshelf:
+    image: ghcr.io/advplyr/audiobookshelf:latest
+    container_name: audiobookshelf
+    restart: unless-stopped
+    ports:
+      - "13378:80"  # Web interface
+    volumes:
+      # Audiobook library - where your .m4b files go
+      - ../output:/audiobooks
+      # Podcast folder (optional, can be empty)
+      - ./volumes/podcasts:/podcasts
+      # Audiobookshelf configuration
+      - ./volumes/config:/config
+      # Audiobookshelf metadata (covers, cache, etc.)
+      - ./volumes/metadata:/metadata
+    environment:
+      - TZ=Europe/Amsterdam  # Change to your timezone
+    # Healthcheck to ensure service is running
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+# Network configuration (optional, for Tailscale integration)
+networks:
+  default:
+    name: audiobook-network
+    driver: bridge

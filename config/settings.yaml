@@ -1,0 +1,116 @@
+# Audiobook Generation System - Configuration
+# Edit these settings to customize your audiobook generation
+
+# =============================================================================
+# VOICE SETTINGS
+# =============================================================================
+voice:
+  # Kokoro voice options:
+  # Female: af_sky (calm), af_bella, af_nicole, af_sarah
+  # Male: am_michael (calm), am_adam, am_fenrir
+  # Recommended for audiobooks: af_sky or am_michael (calm, neutral, non-theatrical)
+  default: "af_sky"
+
+  # Speech rate (1.0 = normal, 0.9 = slightly slower for better comprehension)
+  speed: 0.95
+
+  # Language code
+  lang: "en-us"
+
+# =============================================================================
+# AUDIO SETTINGS
+# =============================================================================
+audio:
+  # Output format for intermediate files
+  intermediate_format: "wav"
+
+  # Sample rate (24000 is Kokoro's native rate)
+  sample_rate: 24000
+
+  # Final m4b quality settings
+  m4b:
+    # Audio bitrate for AAC encoding (64k-128k recommended for speech)
+    bitrate: "64k"
+    # Channels (1 = mono, 2 = stereo) - mono is fine for audiobooks
+    channels: 1
+
+# =============================================================================
+# CHAPTER SETTINGS
+# =============================================================================
+chapters:
+  # Minimum chapter length in characters (prevents tiny chapters)
+  min_length: 500
+
+  # Maximum chapter length in characters (splits long chapters)
+  max_length: 50000
+
+  # Patterns to detect chapter starts (regex)
+  patterns:
+    - "^Chapter\\s+\\d+"
+    - "^CHAPTER\\s+\\d+"
+    - "^Part\\s+\\d+"
+    - "^PART\\s+\\d+"
+    - "^Section\\s+\\d+"
+    - "^\\d+\\.\\s+[A-Z]"
+    - "^[IVXLC]+\\.\\s+"  # Roman numerals
+
+  # Pause duration between chapters (seconds)
+  pause_between: 1.5
+
+# =============================================================================
+# TEXT PROCESSING
+# =============================================================================
+text:
+  # Characters to clean from extracted PDF text
+  remove_patterns:
+    - "\\f"           # Form feed
+    - "\\x0c"         # Page break
+    - "(?m)^\\d+$"    # Standalone page numbers
+
+  # Sentence ending pause multiplier
+  sentence_pause: 1.2
+
+  # Paragraph pause multiplier
+  paragraph_pause: 1.5
+
+  # Maximum line length before wrapping
+  max_line_length: 1000
+
+# =============================================================================
+# PATHS (relative to project root)
+# =============================================================================
+paths:
+  input: "input"
+  output: "output"
+  processing: "processing"
+  covers: "covers"
+
+# =============================================================================
+# PROCESSING
+# =============================================================================
+processing:
+  # Number of parallel workers for TTS (adjust based on your hardware)
+  # Higher = faster but more RAM/VRAM usage
+  workers: 1
+
+  # Chunk size for text processing (characters)
+  chunk_size: 5000
+
+  # Save intermediate WAV files (useful for debugging)
+  keep_intermediate: false
+
+  # GPU acceleration (if available)
+  use_gpu: true
+
+# =============================================================================
+# METADATA DEFAULTS
+# =============================================================================
+metadata:
+  # Default narrator name
+  narrator: "AI Narrator"
+
+  # Default genre
+  genre: "Audiobook"
+
+  # Copyright notice
+  copyright: "Personal Use Only"
