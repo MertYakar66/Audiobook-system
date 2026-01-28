@@ -12,20 +12,46 @@ A private, local audiobook generation system that converts PDF books into high-q
 - **Remote Access**: Tailscale support for secure mobile listening
 - **100% Local**: No cloud services, no subscription costs
 
-## Quick Start
+## Requirements
 
-```bash
-# 1. Install dependencies
+**CRITICAL: Python 3.12.x is required** (Audiblez does not support Python 3.13+)
+
+- Python 3.12.x (NOT 3.13)
+- FFmpeg
+- Docker Desktop (for Audiobookshelf)
+- ~4GB RAM for TTS processing
+- GPU recommended but not required
+
+## Quick Start (Windows)
+
+```powershell
+# 1. Run the setup script (handles Python 3.12, venv, dependencies)
+.\setup.ps1
+
+# 2. Activate virtual environment
+.\venv\Scripts\Activate.ps1
+
+# 3. Verify installation
+python -m scripts.main info
+
+# 4. Convert a PDF to audiobook
+python -m scripts.main convert "input\My Book.pdf"
+
+# 5. Start Audiobookshelf
+cd docker && docker-compose up -d
+```
+
+Or manually:
+```powershell
+# Create virtual environment with Python 3.12
+py -3.12 -m venv venv
+.\venv\Scripts\Activate.ps1
+
+# Install dependencies
 pip install -r requirements.txt
 
-# 2. Install FFmpeg (Windows)
-winget install FFmpeg
-
-# 3. Convert a PDF to audiobook
-python -m scripts.main convert "My Book.pdf"
-
-# 4. Start Audiobookshelf
-cd docker && docker-compose up -d
+# Download Kokoro TTS models
+python -c "import kokoro; kokoro.build()"
 ```
 
 ## Project Structure
@@ -130,14 +156,6 @@ audio:
   m4b:
     bitrate: "64k"   # Audio quality
 ```
-
-## Requirements
-
-- Python 3.10+
-- FFmpeg
-- Docker (for Audiobookshelf)
-- ~4GB RAM for TTS processing
-- GPU recommended but not required
 
 ## Documentation
 

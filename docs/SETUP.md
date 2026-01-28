@@ -5,18 +5,48 @@ This guide walks you through setting up the Audiobook Generation System on Windo
 ## Prerequisites
 
 - Windows 10/11 with powerful hardware (8GB+ RAM, GPU recommended)
-- Python 3.10 or higher
+- **Python 3.12.x** (CRITICAL: Python 3.13+ is NOT supported by Audiblez)
 - Docker Desktop
 - Git (optional, for updates)
 
-## Step 1: Install Python
+## Step 1: Install Python 3.12
 
-1. Download Python 3.10+ from [python.org](https://www.python.org/downloads/)
-2. Run installer, check "Add Python to PATH"
-3. Verify installation:
-   ```cmd
-   python --version
-   ```
+**IMPORTANT:** Audiblez requires Python <3.13. You must use Python 3.12.x.
+
+### If You Have Python 3.13 Installed
+
+1. **Uninstall Python 3.13:**
+   - Open Settings > Apps > Installed Apps
+   - Search for "Python 3.13"
+   - Click Uninstall
+   - Also remove from PATH if needed
+
+2. **Install Python 3.12:**
+
+**Option A: Using winget (Recommended)**
+```powershell
+winget install Python.Python.3.12
+```
+
+**Option B: Direct Download**
+1. Download Python 3.12.8 from: https://www.python.org/downloads/release/python-3128/
+2. Select "Windows installer (64-bit)"
+3. Run installer
+4. CHECK "Add python.exe to PATH"
+5. Click "Install Now"
+
+3. **Verify installation:**
+```powershell
+py -3.12 --version
+# Should show: Python 3.12.x
+```
+
+### Multiple Python Versions
+
+If you need both Python 3.12 and 3.13:
+- Install Python 3.12 using the steps above
+- Use `py -3.12` to specifically use Python 3.12
+- The virtual environment will lock in the correct version
 
 ## Step 2: Install FFmpeg
 
@@ -50,15 +80,30 @@ ffprobe -version
 
 ## Step 4: Set Up the Project
 
-```cmd
-# Navigate to project directory
-cd C:\Users\merty\Audiobook-system
+**Option A: Use the Setup Script (Recommended)**
 
-# Create virtual environment
-python -m venv venv
+```powershell
+# Navigate to project directory
+cd C:\Users\merty\Desktop\Audiobook-system
+
+# Run the setup script
+.\setup.ps1
+```
+
+**Option B: Manual Setup**
+
+```powershell
+# Navigate to project directory
+cd C:\Users\merty\Desktop\Audiobook-system
+
+# Create virtual environment with Python 3.12 specifically
+py -3.12 -m venv venv
 
 # Activate virtual environment
-venv\Scripts\activate
+.\venv\Scripts\Activate.ps1
+
+# Upgrade pip
+python -m pip install --upgrade pip
 
 # Install dependencies
 pip install -r requirements.txt
@@ -68,15 +113,19 @@ pip install -r requirements.txt
 
 Audiblez is the TTS engine that uses the Kokoro-82M model.
 
-```cmd
-# Install audiblez (includes kokoro)
-pip install audiblez
+```powershell
+# Audiblez is already in requirements.txt, but you can verify:
+pip show audiblez
 
 # Verify installation
 audiblez --help
+
+# Download Kokoro TTS models (~300MB)
+# This downloads the model files on first use
+python -c "from kokoro import KPipeline; p = KPipeline(lang_code='a'); print('Models downloaded!')"
 ```
 
-**First run will download the Kokoro model (~300MB)**
+**Note:** First run will download the Kokoro model (~300MB). This may take a few minutes depending on your internet connection.
 
 ## Step 6: Configure Settings
 
@@ -151,11 +200,28 @@ python -m scripts.main info
 
 ## Troubleshooting
 
+### "audiblez requires Python <3.13" or installation fails
+
+You're using Python 3.13+. Switch to Python 3.12:
+```powershell
+# Check current Python version
+python --version
+
+# If it shows 3.13, use py launcher to target 3.12
+py -3.12 --version
+
+# Recreate venv with Python 3.12
+Remove-Item -Recurse -Force venv
+py -3.12 -m venv venv
+.\venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
 ### "audiblez not found"
 
 Make sure you've activated the virtual environment:
-```cmd
-venv\Scripts\activate
+```powershell
+.\venv\Scripts\Activate.ps1
 ```
 
 ### FFmpeg errors

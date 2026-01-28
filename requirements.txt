@@ -1,4 +1,8 @@
 # Audiobook Generation System - Python Dependencies
+#
+# IMPORTANT: Requires Python 3.10-3.12 (Python 3.13+ is NOT supported)
+# Audiblez/Kokoro has a hard dependency on Python <3.13
+#
 
 # PDF Processing
 PyMuPDF>=1.23.0          # PDF text extraction (fitz)
