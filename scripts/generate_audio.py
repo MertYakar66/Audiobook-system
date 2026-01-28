@@ -1,7 +1,7 @@
 """
 TTS Audio Generation Module
 
-Generates audio from text using Audiblez with Kokoro-82M model.
+Generates audio from text using Kokoro-82M TTS model directly.
 Supports chunked processing for long texts and progress tracking.
 """
 
@@ -10,7 +10,9 @@ import subprocess
 import tempfile
 from pathlib import Path
 from typing import List, Optional, Generator
-import shutil
+
+import soundfile as sf
+import numpy as np
 
 from scripts.utils.config import config
 from scripts.utils import logger
@@ -18,11 +20,29 @@ from scripts.utils import logger
 
 class TTSGenerator:
     """
-    Generate audio from text using Audiblez + Kokoro.
+    Generate audio from text using Kokoro TTS.
 
-    Audiblez is a CLI tool that uses the Kokoro-82M model for high-quality TTS.
-    This class wraps audiblez to provide programmatic access.
+    Uses the Kokoro-82M model directly via Python API for high-quality TTS.
     """
+
+    # Kokoro voice mapping
+    VOICE_MAP = {
+        # American Female voices
+        "af_sky": "af_sky",
+        "af_bella": "af_bella",
+        "af_nicole": "af_nicole",
+        "af_sarah": "af_sarah",
+        "af_heart": "af_heart",
+        # American Male voices
+        "am_michael": "am_michael",
+        "am_adam": "am_adam",
+        "am_fenrir": "am_fenrir",
+        # British voices
+        "bf_emma": "bf_emma",
+        "bf_isabella": "bf_isabella",
+        "bm_george": "bm_george",
+        "bm_lewis": "bm_lewis",
+    }
 
     def __init__(
         self,
@@ -35,33 +55,41 @@ class TTSGenerator:
 
         Args:
             voice: Voice to use (e.g., 'af_sky', 'am_michael')
-            speed: Speech speed multiplier
-            lang: Language code
+            speed: Speech speed multiplier (default 1.0)
+            lang: Language code ('a' for American, 'b' for British)
         """
         self.voice = voice or config.voice
         self.speed = speed or config.voice_speed
-        self.lang = lang or config.get("voice", "lang", default="en-us")
         self.sample_rate = config.sample_rate
 
-        # Verify audiblez is available
-        self._verify_audiblez()
+        # Determine language from voice prefix
+        if lang:
+            self.lang = lang
+        elif self.voice.startswith("b"):
+            self.lang = "b"  # British
+        else:
+            self.lang = "a"  # American (default)
 
-    def _verify_audiblez(self) -> None:
-        """Verify that audiblez is installed and accessible."""
-        if shutil.which("audiblez") is None:
-            # Try to find it in common locations
-            possible_paths = [
-                Path.home() / ".local" / "bin" / "audiblez",
-                Path("/usr/local/bin/audiblez"),
-            ]
-            for path in possible_paths:
-                if path.exists():
-                    return
+        # Lazy load the pipeline
+        self._pipeline = None
 
-            logger.warning(
-                "audiblez not found in PATH. "
-                "Install with: pip install audiblez"
-            )
+    def _get_pipeline(self):
+        """Lazy load Kokoro pipeline."""
+        if self._pipeline is None:
+            try:
+                from kokoro import KPipeline
+                logger.info(f"Loading Kokoro TTS (lang={self.lang})...")
+                self._pipeline = KPipeline(lang_code=self.lang)
+                logger.success("Kokoro TTS loaded successfully")
+            except ImportError:
+                logger.error(
+                    "Kokoro not found. Install with: pip install kokoro-onnx"
+                )
+                raise
+            except Exception as e:
+                logger.error(f"Failed to load Kokoro: {e}")
+                raise
+        return self._pipeline
 
     def generate_audio(
         self,
@@ -80,59 +108,42 @@ class TTSGenerator:
         Returns:
             Path to generated audio file
         """
-        output_path = Path(output_path)
+        output_path = Path(output_path).with_suffix(".wav")
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Create temporary text file for audiblez
-        with tempfile.NamedTemporaryFile(
-            mode="w",
-            suffix=".txt",
-            delete=False,
-            encoding="utf-8",
-        ) as f:
-            f.write(text)
-            text_file = f.name
+        pipeline = self._get_pipeline()
 
-        try:
-            # Build audiblez command
-            cmd = [
-                "audiblez",
-                text_file,
-                "-v", self.voice,
-                "-s", str(self.speed),
-                "-l", self.lang,
-                "-f", "wav",  # Output WAV for further processing
-                "-o", str(output_path.with_suffix(".wav")),
-            ]
-
-            if config.use_gpu:
-                # Audiblez uses GPU by default if available
-                pass
-
+        if show_progress:
             logger.info(f"Generating audio with voice: {self.voice}")
 
-            # Run audiblez
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                check=False,
-            )
+        try:
+            # Generate audio using Kokoro pipeline
+            # The pipeline returns a generator of (graphemes, phonemes, audio) tuples
+            audio_segments = []
 
-            if result.returncode != 0:
-                logger.error(f"Audiblez error: {result.stderr}")
-                raise RuntimeError(f"TTS generation failed: {result.stderr}")
+            for i, (gs, ps, audio) in enumerate(pipeline(text, voice=self.voice, speed=self.speed)):
+                audio_segments.append(audio)
+                if show_progress and i % 10 == 0:
+                    logger.info(f"  Processing segment {i+1}...")
 
-            output_wav = output_path.with_suffix(".wav")
-            if output_wav.exists():
-                logger.success(f"Generated audio: {output_wav}")
-                return output_wav
-            else:
-                raise FileNotFoundError(f"Expected output not found: {output_wav}")
+            if not audio_segments:
+                raise RuntimeError("No audio generated from text")
 
-        finally:
-            # Clean up temp file
-            os.unlink(text_file)
+            # Concatenate all audio segments
+            full_audio = np.concatenate(audio_segments)
+
+            # Save to WAV file
+            sf.write(str(output_path), full_audio, self.sample_rate)
+
+            if show_progress:
+                duration = len(full_audio) / self.sample_rate
+                logger.success(f"Generated audio: {output_path} ({duration:.1f}s)")
+
+            return output_path
+
+        except Exception as e:
+            logger.error(f"TTS generation failed: {e}")
+            raise RuntimeError(f"TTS generation failed: {e}")
 
     def generate_chapter_audio(
         self,

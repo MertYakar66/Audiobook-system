@@ -407,16 +407,22 @@ def info():
 
     logger.console.print("\n[bold]Dependencies:[/bold]")
 
-    # Check for required tools
+    # Check for required CLI tools
     tools = {
         "ffmpeg": shutil.which("ffmpeg"),
         "ffprobe": shutil.which("ffprobe"),
-        "audiblez": shutil.which("audiblez"),
     }
 
     for tool, path in tools.items():
         status = "[green]OK[/green]" if path else "[red]NOT FOUND[/red]"
         logger.console.print(f"  {tool:<12} {status}")
+
+    # Check for Kokoro TTS
+    try:
+        import kokoro
+        logger.console.print(f"  {'kokoro':<12} [green]OK[/green]")
+    except ImportError:
+        logger.console.print(f"  {'kokoro':<12} [red]NOT FOUND[/red]")
 
 
 def main():
