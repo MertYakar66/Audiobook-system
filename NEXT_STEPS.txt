@@ -1,0 +1,202 @@
+================================================================================
+                    AUDIOBOOK SYSTEM - WHAT TO DO NEXT
+================================================================================
+
+You have Docker installed. Great! Here's what to do now, step by step.
+
+
+--------------------------------------------------------------------------------
+STEP 1: OPEN POWERSHELL
+--------------------------------------------------------------------------------
+
+1. Press the Windows key on your keyboard
+2. Type "PowerShell"
+3. Click on "Windows PowerShell"
+
+
+--------------------------------------------------------------------------------
+STEP 2: GO TO YOUR PROJECT FOLDER
+--------------------------------------------------------------------------------
+
+Type this command and press Enter:
+
+    cd C:\Users\merty\Desktop\Audiobook-system
+
+
+--------------------------------------------------------------------------------
+STEP 3: RUN THE SETUP SCRIPT
+--------------------------------------------------------------------------------
+
+Type this command and press Enter:
+
+    .\setup.ps1
+
+This script will:
+- Check that you have Python 3.12
+- Check that you have FFmpeg (and install it if missing)
+- Create a virtual environment
+- Install all the required software
+- Download the voice model (about 300 MB)
+
+Wait for it to finish. This may take 5-10 minutes.
+
+
+--------------------------------------------------------------------------------
+STEP 4: ACTIVATE THE VIRTUAL ENVIRONMENT
+--------------------------------------------------------------------------------
+
+After setup finishes, type this command:
+
+    .\venv\Scripts\Activate.ps1
+
+You should see "(venv)" appear at the start of your command line.
+This means the virtual environment is active.
+
+
+--------------------------------------------------------------------------------
+STEP 5: TEST THAT EVERYTHING WORKS
+--------------------------------------------------------------------------------
+
+Type this command:
+
+    python -m scripts.main info
+
+You should see:
+- Paths (where files go)
+- Voice settings
+- Audio settings
+- Dependencies (all should say "OK")
+
+If you see errors, check the TROUBLESHOOTING section below.
+
+
+--------------------------------------------------------------------------------
+STEP 6: TEST THE VOICE
+--------------------------------------------------------------------------------
+
+Type this command:
+
+    python -m scripts.main test-voice
+
+This creates a file called "test_output.wav" in your project folder.
+Double-click it to hear the test voice.
+
+
+--------------------------------------------------------------------------------
+STEP 7: TRY CONVERTING A BOOK (OPTIONAL)
+--------------------------------------------------------------------------------
+
+1. Put a PDF file in the "input" folder
+2. Type this command (replace "mybook.pdf" with your file name):
+
+    python -m scripts.main convert "input\mybook.pdf"
+
+3. Wait for it to finish
+4. Find your audiobook in the "output" folder
+
+
+--------------------------------------------------------------------------------
+LATER: START AUDIOBOOKSHELF (WHEN READY)
+--------------------------------------------------------------------------------
+
+When you want to set up Audiobookshelf (the library app):
+
+1. Make sure Docker Desktop is running
+2. Type these commands:
+
+    cd docker
+    docker-compose up -d
+
+3. Open your web browser
+4. Go to: http://localhost:13378
+5. Create an account
+6. Add your audiobook library
+
+
+================================================================================
+                           TROUBLESHOOTING
+================================================================================
+
+
+PROBLEM: "Python 3.12 not found"
+--------------------------------
+You need to install Python 3.12. Type this command:
+
+    winget install Python.Python.3.12
+
+Then close PowerShell and start again from Step 1.
+
+
+PROBLEM: "FFmpeg not found"
+---------------------------
+Type this command:
+
+    winget install FFmpeg
+
+Then close PowerShell and start again from Step 4.
+
+
+PROBLEM: "kokoro not found" or import errors
+--------------------------------------------
+Make sure you activated the virtual environment:
+
+    .\venv\Scripts\Activate.ps1
+
+You should see "(venv)" at the start of your command line.
+
+
+PROBLEM: Script won't run (security error)
+------------------------------------------
+Type this command first:
+
+    Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+
+Then try running the setup script again.
+
+
+PROBLEM: Docker errors
+----------------------
+1. Make sure Docker Desktop is running (check the system tray)
+2. Wait a minute for Docker to fully start
+3. Try the command again
+
+
+================================================================================
+                              QUICK REFERENCE
+================================================================================
+
+COMMANDS YOU'LL USE OFTEN:
+
+    .\venv\Scripts\Activate.ps1              # Turn on the virtual environment
+    python -m scripts.main info              # Check if everything works
+    python -m scripts.main test-voice        # Test the voice
+    python -m scripts.main convert "file"    # Convert a PDF to audiobook
+    python -m scripts.main list-voices       # See all available voices
+
+
+FOLDERS:
+
+    input/     - Put your PDF files here
+    output/    - Find your finished audiobooks here
+    config/    - Settings file is here
+
+
+VOICES (use with --voice option):
+
+    af_sky      - Female, calm (default, recommended)
+    am_michael  - Male, calm (recommended)
+    af_bella    - Female, warm
+    am_adam     - Male, deep
+
+
+================================================================================
+                              NEED MORE HELP?
+================================================================================
+
+Read these files for more details:
+
+    docs/SETUP.md      - Full setup instructions
+    docs/TAILSCALE.md  - How to listen on your phone
+    README.md          - Overview of the whole system
+
+================================================================================
