@@ -5,13 +5,13 @@ This guide walks you through setting up the Audiobook Generation System on Windo
 ## Prerequisites
 
 - Windows 10/11 with powerful hardware (8GB+ RAM, GPU recommended)
-- **Python 3.12.x** (CRITICAL: Python 3.13+ is NOT supported by Audiblez)
+- **Python 3.12.x** (CRITICAL: Python 3.13+ is NOT supported by Kokoro TTS)
 - Docker Desktop
 - Git (optional, for updates)
 
 ## Step 1: Install Python 3.12
 
-**IMPORTANT:** Audiblez requires Python <3.13. You must use Python 3.12.x.
+**IMPORTANT:** Kokoro TTS requires Python <3.13. You must use Python 3.12.x.
 
 ### If You Have Python 3.13 Installed
 
@@ -109,16 +109,13 @@ python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-## Step 5: Install Audiblez + Kokoro
+## Step 5: Download Kokoro TTS Models
 
-Audiblez is the TTS engine that uses the Kokoro-82M model.
+Kokoro-82M is the TTS engine that generates natural-sounding speech.
 
 ```powershell
-# Audiblez is already in requirements.txt, but you can verify:
-pip show audiblez
-
-# Verify installation
-audiblez --help
+# Verify Kokoro is installed
+pip show kokoro
 
 # Download Kokoro TTS models (~300MB)
 # This downloads the model files on first use
@@ -200,7 +197,7 @@ python -m scripts.main info
 
 ## Troubleshooting
 
-### "audiblez requires Python <3.13" or installation fails
+### "kokoro requires Python <3.13" or installation fails
 
 You're using Python 3.13+. Switch to Python 3.12:
 ```powershell
@@ -217,11 +214,14 @@ py -3.12 -m venv venv
 pip install -r requirements.txt
 ```
 
-### "audiblez not found"
+### "kokoro not found" or import errors
 
 Make sure you've activated the virtual environment:
 ```powershell
 .\venv\Scripts\Activate.ps1
+
+# Then verify installation
+python -c "import kokoro; print('OK')"
 ```
 
 ### FFmpeg errors

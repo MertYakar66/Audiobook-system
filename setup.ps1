@@ -43,7 +43,7 @@ if (-not $pythonCmd) {
         } elseif ($pyVersion -match "Python 3\.1[3-9]|Python 3\.[2-9][0-9]") {
             Write-Host ""
             Write-Host "  ERROR: $pyVersion detected" -ForegroundColor Red
-            Write-Host "  Audiblez requires Python 3.12.x (NOT 3.13+)" -ForegroundColor Red
+            Write-Host "  Kokoro TTS requires Python 3.12.x (NOT 3.13+)" -ForegroundColor Red
             Write-Host ""
             Write-Host "  To fix this:" -ForegroundColor Yellow
             Write-Host "  1. Install Python 3.12:" -ForegroundColor White

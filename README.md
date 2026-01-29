@@ -4,7 +4,7 @@ A private, local audiobook generation system that converts PDF books into high-q
 
 ## Features
 
-- **High-Quality TTS**: Uses Audiblez + Kokoro-82M for natural-sounding narration
+- **High-Quality TTS**: Uses Kokoro-82M for natural-sounding narration
 - **Chapter Detection**: Automatic chapter detection and embedded chapter markers
 - **Metadata Support**: Title, author, narrator, and cover art embedding
 - **M4B Output**: Industry-standard audiobook format compatible with all players
@@ -14,7 +14,7 @@ A private, local audiobook generation system that converts PDF books into high-q
 
 ## Requirements
 
-**CRITICAL: Python 3.12.x is required** (Audiblez does not support Python 3.13+)
+**CRITICAL: Python 3.12.x is required** (Kokoro TTS does not support Python 3.13+)
 
 - Python 3.12.x (NOT 3.13)
 - FFmpeg
@@ -50,8 +50,8 @@ py -3.12 -m venv venv
 # Install dependencies
 pip install -r requirements.txt
 
-# Download Kokoro TTS models
-python -c "import kokoro; kokoro.build()"
+# Download Kokoro TTS models (first run downloads ~300MB)
+python -c "from kokoro import KPipeline; KPipeline(lang_code='a')"
 ```
 
 ## Project Structure
