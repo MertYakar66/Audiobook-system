@@ -1,6 +1,6 @@
 # Audiobook Generation System
 
-A private, local audiobook generation system that converts PDF books into high-quality M4B audiobooks with chapter markers, metadata, and cover art.
+A private, local audiobook generation system that converts PDF books into high-quality M4B audiobooks with chapter markers, metadata, and cover art. Now with **Read-Along mode** for synchronized audio-text reading.
 
 ## Features
 
@@ -8,9 +8,20 @@ A private, local audiobook generation system that converts PDF books into high-q
 - **Chapter Detection**: Automatic chapter detection and embedded chapter markers
 - **Metadata Support**: Title, author, narrator, and cover art embedding
 - **M4B Output**: Industry-standard audiobook format compatible with all players
+- **Read-Along Mode**: Synchronized audio-text reading with sentence highlighting
 - **Library Management**: Audiobookshelf integration for library and playback
 - **Remote Access**: Tailscale support for secure mobile listening
 - **100% Local**: No cloud services, no subscription costs
+
+## Read-Along Mode
+
+The Read-Along feature provides an Everand-like experience where you can:
+- **Listen and read simultaneously** with synchronized highlighting
+- **Tap any sentence** to jump to that position in the audio
+- **Auto-scroll** keeps the current sentence in view
+- **Multiple themes**: Light, Sepia, Dark modes
+- **Adjustable font size** for comfortable reading
+- **Keyboard shortcuts**: Space to play/pause, arrows to navigate
 
 ## Requirements
 
@@ -59,21 +70,31 @@ python -c "from kokoro import KPipeline; KPipeline(lang_code='a')"
 ```
 Audiobook-system/
 ├── config/
-│   └── settings.yaml      # Configuration file
+│   └── settings.yaml          # Configuration file
 ├── docker/
-│   └── docker-compose.yml # Audiobookshelf container
+│   └── docker-compose.yml     # Audiobookshelf container
 ├── docs/
-│   ├── SETUP.md           # Detailed setup guide
-│   └── TAILSCALE.md       # Remote access guide
-├── input/                 # Place PDFs/text files here
-├── output/                # Generated audiobooks
+│   ├── SETUP.md               # Detailed setup guide
+│   └── TAILSCALE.md           # Remote access guide
+├── input/                     # Place PDFs/text files here
+├── output/                    # Generated audiobooks
+│   └── readalong/             # Read-Along processed books
 ├── scripts/
-│   ├── main.py            # CLI entry point
-│   ├── extract_text.py    # PDF text extraction
-│   ├── clean_text.py      # Text cleaning/normalization
-│   ├── generate_audio.py  # TTS generation
-│   ├── create_audiobook.py# M4B creation
-│   └── metadata.py        # Metadata/cover handling
+│   ├── main.py                # CLI entry point
+│   ├── extract_text.py        # PDF text extraction
+│   ├── clean_text.py          # Text cleaning/normalization
+│   ├── generate_audio.py      # TTS generation
+│   ├── create_audiobook.py    # M4B creation
+│   ├── metadata.py            # Metadata/cover handling
+│   └── readalong/             # Read-Along module
+│       ├── sentence_splitter.py   # Sentence splitting
+│       ├── timed_tts.py           # TTS with timing capture
+│       ├── timing_map.py          # Timing JSON generation
+│       └── book_processor.py      # Complete pipeline
+├── web/                       # Read-Along web reader
+│   ├── index.html             # Main reader page
+│   ├── styles.css             # Reader styles
+│   └── reader.js              # Sync logic
 ├── requirements.txt
 └── README.md
 ```
@@ -97,8 +118,11 @@ python -m scripts.main convert "input/book.pdf" \
 ### Available Commands
 
 ```bash
-# Convert PDF/text to audiobook
+# Convert PDF/text to M4B audiobook
 python -m scripts.main convert <file>
+
+# Create Read-Along book (synchronized audio-text)
+python -m scripts.main readalong <file>
 
 # Extract text from PDF (for manual editing)
 python -m scripts.main extract <pdf>
@@ -117,6 +141,22 @@ python -m scripts.main list-voices
 
 # Show system info
 python -m scripts.main info
+```
+
+### Read-Along Workflow
+
+```bash
+# 1. Process a book for Read-Along
+python -m scripts.main readalong "input/The Intelligent Investor.pdf"
+
+# 2. Start a local web server
+python -m http.server 8000 --directory web
+
+# 3. Open http://localhost:8000 in your browser
+
+# 4. Click "Select Book Folder" and choose output/readalong/<book>/
+
+# 5. Read along with synchronized audio-text highlighting!
 ```
 
 ### Available Voices

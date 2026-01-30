@@ -4,9 +4,10 @@
 # Audiblez/Kokoro has a hard dependency on Python <3.13
 #
 
-# PDF Processing
+# Document Processing
 PyMuPDF>=1.23.0          # PDF text extraction (fitz)
 pdfplumber>=0.10.0       # Alternative PDF extraction
+python-docx>=1.0.0       # DOCX file support
 
 # Text Processing
 nltk>=3.8.0              # Natural language processing

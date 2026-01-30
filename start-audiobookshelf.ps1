@@ -32,7 +32,8 @@ try {
 # Create necessary directories
 Write-Host "[2/4] Creating directories..." -ForegroundColor Yellow
 
-$projectRoot = Split-Path -Parent $PSScriptRoot
+# Script is in project root, so use $PSScriptRoot directly
+$projectRoot = $PSScriptRoot
 $dockerDir = Join-Path $projectRoot "docker"
 $outputDir = Join-Path $projectRoot "output"
 

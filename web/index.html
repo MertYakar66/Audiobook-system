@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Read-Along Reader</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <button id="menu-btn" class="icon-btn" title="Library">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="3" y1="6" x2="21" y2="6"/>
+                        <line x1="3" y1="12" x2="21" y2="12"/>
+                        <line x1="3" y1="18" x2="21" y2="18"/>
+                    </svg>
+                </button>
+                <div class="book-info">
+                    <h1 id="book-title">Select a Book</h1>
+                    <span id="book-author"></span>
+                </div>
+                <button id="settings-btn" class="icon-btn" title="Settings">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="content">
+            <!-- Loading State -->
+            <div id="loading-state" class="state-view">
+                <div class="loader"></div>
+                <p>Loading book...</p>
+            </div>
+
+            <!-- Empty State -->
+            <div id="empty-state" class="state-view active">
+                <div class="empty-icon">📚</div>
+                <h2>Welcome to Read-Along</h2>
+                <p>Drop a book folder here or select from the library</p>
+                <button id="select-book-btn" class="primary-btn">Select Book Folder</button>
+                <input type="file" id="folder-input" webkitdirectory directory style="display: none;">
+            </div>
+
+            <!-- Reader View -->
+            <div id="reader-view" class="reader">
+                <!-- Chapter Navigation -->
+                <nav class="chapter-nav">
+                    <button id="prev-chapter" class="chapter-btn" disabled>← Previous</button>
+                    <select id="chapter-select"></select>
+                    <button id="next-chapter" class="chapter-btn" disabled>Next →</button>
+                </nav>
+
+                <!-- Text Content -->
+                <article id="text-content" class="text-content">
+                    <!-- Paragraphs and sentences rendered here -->
+                </article>
+            </div>
+        </main>
+
+        <!-- Audio Player -->
+        <footer class="player" id="player">
+            <audio id="audio" preload="auto"></audio>
+
+            <!-- Progress Bar -->
+            <div class="progress-container">
+                <div id="progress-bar" class="progress-bar">
+                    <div id="progress-fill" class="progress-fill"></div>
+                    <div id="progress-handle" class="progress-handle"></div>
+                </div>
+                <div class="time-display">
+                    <span id="current-time">0:00</span>
+                    <span id="total-time">0:00</span>
+                </div>
+            </div>
+
+            <!-- Controls -->
+            <div class="controls">
+                <button id="skip-back" class="control-btn" title="Back 10s">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="11 19 2 12 11 5 11 19"/>
+                        <line x1="22" y1="12" x2="11" y2="12"/>
+                    </svg>
+                    <span>10</span>
+                </button>
+
+                <button id="play-pause" class="play-btn" title="Play/Pause">
+                    <svg id="play-icon" viewBox="0 0 24 24" fill="currentColor">
+                        <polygon points="5 3 19 12 5 21 5 3"/>
+                    </svg>
+                    <svg id="pause-icon" viewBox="0 0 24 24" fill="currentColor" style="display: none;">
+                        <rect x="6" y="4" width="4" height="16"/>
+                        <rect x="14" y="4" width="4" height="16"/>
+                    </svg>
+                </button>
+
+                <button id="skip-forward" class="control-btn" title="Forward 30s">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="13 19 22 12 13 5 13 19"/>
+                        <line x1="2" y1="12" x2="13" y2="12"/>
+                    </svg>
+                    <span>30</span>
+                </button>
+
+                <div class="speed-control">
+                    <button id="speed-btn" class="control-btn">
+                        <span id="speed-value">1.0x</span>
+                    </button>
+                    <div id="speed-menu" class="speed-menu">
+                        <button data-speed="0.5">0.5x</button>
+                        <button data-speed="0.75">0.75x</button>
+                        <button data-speed="1" class="active">1.0x</button>
+                        <button data-speed="1.25">1.25x</button>
+                        <button data-speed="1.5">1.5x</button>
+                        <button data-speed="2">2.0x</button>
+                    </div>
+                </div>
+            </div>
+        </footer>
+
+        <!-- Settings Panel -->
+        <div id="settings-panel" class="settings-panel">
+            <div class="settings-content">
+                <h2>Settings</h2>
+
+                <div class="setting-group">
+                    <label>Font Size</label>
+                    <div class="font-size-controls">
+                        <button id="font-decrease">A-</button>
+                        <span id="font-size-value">18px</span>
+                        <button id="font-increase">A+</button>
+                    </div>
+                </div>
+
+                <div class="setting-group">
+                    <label>Theme</label>
+                    <div class="theme-options">
+                        <button data-theme="light" class="theme-btn active">Light</button>
+                        <button data-theme="sepia" class="theme-btn">Sepia</button>
+                        <button data-theme="dark" class="theme-btn">Dark</button>
+                    </div>
+                </div>
+
+                <div class="setting-group">
+                    <label>Auto-Scroll</label>
+                    <label class="toggle">
+                        <input type="checkbox" id="auto-scroll" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <button id="close-settings" class="close-btn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="reader.js"></script>
+</body>
+</html>

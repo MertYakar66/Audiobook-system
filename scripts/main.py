@@ -32,12 +32,13 @@ from scripts.create_audiobook import (
 from scripts.extract_text import PDFExtractor
 from scripts.generate_audio import TTSGenerator
 from scripts.metadata import CoverArtHandler, MetadataExtractor, get_cover
+from scripts.readalong.book_processor import BookProcessor
 from scripts.utils import logger
 from scripts.utils.config import config
 
 
 @click.group()
-@click.version_option(version="2.0.0")
+@click.version_option(version="3.0.0")
 def cli():
     """
     Audiobook Generation System
@@ -391,6 +392,64 @@ def list_voices():
 
     logger.console.print("\n* Recommended for audiobooks")
     logger.console.print(f"\nCurrent default: {config.voice}")
+
+
+@cli.command()
+@click.argument("input_file", type=click.Path(exists=True))
+@click.option(
+    "-o", "--output",
+    type=click.Path(),
+    help="Output directory (default: output/readalong/<book-id>)",
+)
+@click.option(
+    "-v", "--voice",
+    default=None,
+    help=f"Voice to use (default: {config.voice})",
+)
+@click.option(
+    "-t", "--title",
+    default=None,
+    help="Book title (default: extracted from file)",
+)
+@click.option(
+    "-a", "--author",
+    default=None,
+    help="Author name (default: extracted from file)",
+)
+def readalong(
+    input_file: str,
+    output: Optional[str],
+    voice: Optional[str],
+    title: Optional[str],
+    author: Optional[str],
+):
+    """
+    Create a Read-Along book with synchronized audio and text.
+
+    This produces a web-ready package with:
+    - Sentence-level audio files
+    - Timing maps linking audio to text
+    - Text data for the web reader
+    - Cover image
+
+    Open the web/index.html file and load the output folder
+    to experience synchronized reading.
+    """
+    input_path = Path(input_file)
+
+    processor = BookProcessor(voice=voice)
+    result = processor.process_book(
+        input_path,
+        output_dir=Path(output) if output else None,
+        title=title,
+        author=author,
+    )
+
+    logger.console.print("\n[bold]To use Read-Along:[/bold]")
+    logger.console.print(f"  1. Open web/index.html in your browser")
+    logger.console.print(f"  2. Click 'Select Book Folder'")
+    logger.console.print(f"  3. Select: {result.output_dir}")
+    logger.console.print(f"\n  Or serve with: python -m http.server 8000 --directory web")
 
 
 @cli.command()
