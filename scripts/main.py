@@ -2,8 +2,16 @@
 """
 Audiobook Generation System - Main CLI
 
-Complete pipeline for converting PDF/text files to M4B audiobooks.
-Uses Audiblez + Kokoro-82M for high-quality TTS.
+Professional-grade pipeline for converting PDF/text files to M4B audiobooks.
+Uses Kokoro-82M TTS for high-quality, natural-sounding narration.
+
+Features:
+- PDF text extraction with intelligent cleaning
+- Automatic chapter detection
+- Multiple voice options (American/British, Male/Female)
+- Embedded chapter markers for easy navigation
+- Cover art and metadata support
+- Audiobookshelf integration for playback
 """
 
 import shutil
@@ -29,7 +37,7 @@ from scripts.utils.config import config
 
 
 @click.group()
-@click.version_option(version="1.0.0")
+@click.version_option(version="2.0.0")
 def cli():
     """
     Audiobook Generation System
@@ -196,9 +204,9 @@ def convert(
             logger.info(f"Chapter {i}/{len(chapters)}: {chapter['title']}")
 
             audio_file = audio_dir / f"chapter_{i:03d}.wav"
-            tts.generate_audio(chapter["text"], audio_file)
+            generated_path, _ = tts.generate_audio(chapter["text"], audio_file)
 
-            chapter_audio_files.append(audio_file)
+            chapter_audio_files.append(generated_path)
             chapter_titles.append(chapter["title"])
 
         # Step 6: Create M4B
@@ -347,9 +355,10 @@ def test_voice(voice: Optional[str], text: str, output: str):
     tts = TTSGenerator(voice=voice)
     output_path = Path(output)
 
-    tts.generate_audio(text, output_path)
+    generated_path, duration = tts.generate_audio(text, output_path)
 
-    logger.success(f"Test audio saved to: {output_path}")
+    logger.success(f"Test audio saved to: {generated_path}")
+    logger.info(f"Duration: {duration:.1f} seconds")
     logger.info("Play this file to hear the voice sample.")
 
 
