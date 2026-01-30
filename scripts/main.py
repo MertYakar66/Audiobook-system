@@ -30,6 +30,7 @@ from scripts.create_audiobook import (
     get_audio_duration,
 )
 from scripts.extract_text import PDFExtractor
+from scripts.docx_extractor import DocxExtractor
 from scripts.generate_audio import TTSGenerator
 from scripts.metadata import CoverArtHandler, MetadataExtractor, get_cover
 from scripts.readalong.book_processor import BookProcessor
@@ -135,6 +136,9 @@ def convert(
         if input_path.suffix.lower() == ".pdf":
             with PDFExtractor(input_path) as extractor:
                 text = extractor.extract_all(skip_pages=pages_to_skip)
+        elif input_path.suffix.lower() == ".docx":
+            with DocxExtractor(input_path) as extractor:
+                text = extractor.extract_all()
         else:
             text = input_path.read_text(encoding="utf-8")
 
@@ -265,14 +269,18 @@ def extract(input_file: str, output: Optional[str]):
     """
     input_path = Path(input_file)
 
-    if input_path.suffix.lower() != ".pdf":
-        logger.error("Input must be a PDF file")
+    if input_path.suffix.lower() not in [".pdf", ".docx"]:
+        logger.error("Input must be a PDF or DOCX file")
         sys.exit(1)
 
     logger.header(f"Extracting: {input_path.name}")
 
-    with PDFExtractor(input_path) as extractor:
-        text = extractor.extract_all()
+    if input_path.suffix.lower() == ".pdf":
+        with PDFExtractor(input_path) as extractor:
+            text = extractor.extract_all()
+    else:
+        with DocxExtractor(input_path) as extractor:
+            text = extractor.extract_all()
 
     if output:
         output_path = Path(output)
