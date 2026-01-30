@@ -58,8 +58,11 @@ temp/
 *.log
 logs/
 
-# Docker volumes (if stored locally)
-docker/volumes/
+# Docker volumes (user data - not tracked)
+docker/volumes/config/
+docker/volumes/metadata/
+docker/volumes/podcasts/
+!docker/volumes/.gitkeep
 
 # Audiobookshelf data
 audiobookshelf-config/

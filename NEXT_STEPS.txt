@@ -112,26 +112,47 @@ like Everand or Audible:
 
 When you want to set up Audiobookshelf:
 
+METHOD 1: USE THE STARTUP SCRIPT (EASIEST)
+
+1. Make sure Docker Desktop is running (check system tray)
+2. Open PowerShell and type:
+
+    cd C:\Users\merty\Desktop\Audiobook-system
+    .\start-audiobookshelf.ps1
+
+3. The script will:
+   - Create necessary folders
+   - Start the Audiobookshelf container
+   - Show you the URL to access it
+   - Offer to open your browser
+
+METHOD 2: MANUAL COMMANDS
+
 1. Make sure Docker Desktop is running
 2. Type these commands:
 
-    cd docker
+    cd C:\Users\merty\Desktop\Audiobook-system\docker
     docker-compose up -d
 
 3. Open your web browser
 4. Go to: http://localhost:13378
-5. Create an account
-6. Add your audiobook library:
-   - Click "Add Library"
+
+FIRST TIME SETUP (BOTH METHODS):
+
+1. Create an admin account (username + password)
+2. Click "Add Library"
+3. Set these values:
    - Name: Audiobooks
    - Folder: /audiobooks
    - Type: Audiobook
-   - Click "Add"
+4. Click "Add"
 
-7. Install the mobile app:
+MOBILE APPS:
+
    - iPhone: Search "Plappa" in App Store
    - Android: Search "Audiobookshelf" in Play Store
-   - Connect to: http://YOUR-PC-IP:13378
+   - Server URL: http://YOUR-PC-IP:13378
+     (The startup script shows your IP address)
 
 
 ================================================================================

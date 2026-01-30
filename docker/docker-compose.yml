@@ -2,34 +2,52 @@ version: "3.8"
 
 # Audiobook System - Docker Compose
 # Audiobookshelf for library management and playback
+#
+# USAGE:
+#   Start:   docker-compose up -d
+#   Stop:    docker-compose down
+#   Logs:    docker-compose logs -f
+#   Status:  docker-compose ps
+#
+# ACCESS: http://localhost:13378
 
 services:
   audiobookshelf:
     image: ghcr.io/advplyr/audiobookshelf:latest
     container_name: audiobookshelf
     restart: unless-stopped
+
     ports:
-      - "13378:80"  # Web interface
+      - "13378:80"  # Web interface (use any available port)
+
     volumes:
-      # Audiobook library - where your .m4b files go
-      - ../output:/audiobooks
-      # Podcast folder (optional, can be empty)
-      - ./volumes/podcasts:/podcasts
-      # Audiobookshelf configuration
-      - ./volumes/config:/config
-      # Audiobookshelf metadata (covers, cache, etc.)
-      - ./volumes/metadata:/metadata
+      # Audiobook library - maps to your output folder
+      # On Windows: ../output becomes C:\Users\...\Audiobook-system\output
+      - ../output:/audiobooks:rw
+
+      # Podcast folder (optional)
+      - ./volumes/podcasts:/podcasts:rw
+
+      # Audiobookshelf configuration (stores users, settings)
+      - ./volumes/config:/config:rw
+
+      # Audiobookshelf metadata (covers, progress, cache)
+      - ./volumes/metadata:/metadata:rw
+
     environment:
-      - TZ=Europe/Amsterdam  # Change to your timezone
-    # Healthcheck to ensure service is running
+      # Timezone - change to your local timezone
+      # Examples: America/New_York, Europe/London, Asia/Tokyo
+      - TZ=Europe/Amsterdam
+
+    # Health monitoring
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/healthcheck"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
+      start_period: 15s
 
-# Network configuration (optional, for Tailscale integration)
+# Network for potential future services (Tailscale, etc.)
 networks:
   default:
     name: audiobook-network
