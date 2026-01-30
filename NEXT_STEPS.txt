@@ -99,7 +99,18 @@ STEP 7: TRY CONVERTING A BOOK (OPTIONAL)
 LATER: START AUDIOBOOKSHELF (WHEN READY)
 --------------------------------------------------------------------------------
 
-When you want to set up Audiobookshelf (the library app):
+Audiobookshelf is your audiobook player. It has all the features of apps
+like Everand or Audible:
+
+    - Save your place (automatically remembers where you stopped)
+    - Bookmarks (mark your favorite parts)
+    - Different playback speeds (0.5x to 3x)
+    - Sleep timer (stop playing after X minutes)
+    - Chapter navigation (jump between chapters)
+    - Progress sync (continue on your phone where you left off)
+    - Offline listening (download books to your phone)
+
+When you want to set up Audiobookshelf:
 
 1. Make sure Docker Desktop is running
 2. Type these commands:
@@ -110,7 +121,17 @@ When you want to set up Audiobookshelf (the library app):
 3. Open your web browser
 4. Go to: http://localhost:13378
 5. Create an account
-6. Add your audiobook library
+6. Add your audiobook library:
+   - Click "Add Library"
+   - Name: Audiobooks
+   - Folder: /audiobooks
+   - Type: Audiobook
+   - Click "Add"
+
+7. Install the mobile app:
+   - iPhone: Search "Plappa" in App Store
+   - Android: Search "Audiobookshelf" in Play Store
+   - Connect to: http://YOUR-PC-IP:13378
 
 
 ================================================================================
