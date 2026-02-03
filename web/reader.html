@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#007bff">
+    <meta name="description" content="Read-Along: Listen and read simultaneously with synchronized highlighting">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <link rel="manifest" href="manifest.json">
+    <title>Read-Along Reader</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <a href="library.html" id="home-btn" class="icon-btn" title="Library">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                        <polyline points="9 22 9 12 15 12 15 22" />
+                    </svg>
+                </a>
+                <button id="menu-btn" class="icon-btn" title="Bookmarks">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                    </svg>
+                </button>
+                <div class="book-info">
+                    <h1 id="book-title">Loading...</h1>
+                    <span id="book-author"></span>
+                </div>
+                <button id="search-btn" class="icon-btn" title="Search">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8" />
+                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                    </svg>
+                </button>
+                <button id="settings-btn" class="icon-btn" title="Settings">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3" />
+                        <path
+                            d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="content">
+            <!-- Loading State -->
+            <div id="loading-state" class="state-view">
+                <div class="loader"></div>
+                <p>Loading book...</p>
+            </div>
+
+            <!-- Empty State -->
+            <div id="empty-state" class="state-view active">
+                <div class="empty-icon">📚</div>
+                <h2>No Book Selected</h2>
+                <p>Go to your library to select a book</p>
+                <a href="library.html" class="primary-btn">Go to Library</a>
+            </div>
+
+            <!-- Reader View -->
+            <div id="reader-view" class="reader">
+                <!-- Chapter Navigation -->
+                <nav class="chapter-nav">
+                    <button id="prev-chapter" class="chapter-btn" disabled>← Previous</button>
+                    <select id="chapter-select"></select>
+                    <button id="next-chapter" class="chapter-btn" disabled>Next →</button>
+                </nav>
+
+                <!-- Text Content -->
+                <article id="text-content" class="text-content">
+                    <!-- Paragraphs and sentences rendered here -->
+                </article>
+            </div>
+        </main>
+
+        <!-- Audio Player -->
+        <footer class="player" id="player">
+            <audio id="audio" preload="auto"></audio>
+
+            <!-- Progress Bar -->
+            <div class="progress-container">
+                <div id="progress-bar" class="progress-bar">
+                    <div id="progress-fill" class="progress-fill"></div>
+                    <div id="progress-handle" class="progress-handle"></div>
+                    <!-- Bookmark markers -->
+                    <div id="bookmark-markers" class="bookmark-markers"></div>
+                </div>
+                <div class="time-display">
+                    <span id="current-time">0:00</span>
+                    <span id="sleep-timer-display" class="sleep-timer-display"></span>
+                    <span id="total-time">0:00</span>
+                </div>
+            </div>
+
+            <!-- Controls -->
+            <div class="controls">
+                <button id="sleep-timer-btn" class="control-btn" title="Sleep Timer">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                    </svg>
+                </button>
+
+                <button id="skip-back" class="control-btn" title="Back 10s">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="11 19 2 12 11 5 11 19" />
+                        <line x1="22" y1="12" x2="11" y2="12" />
+                    </svg>
+                    <span>10</span>
+                </button>
+
+                <button id="play-pause" class="play-btn" title="Play/Pause">
+                    <svg id="play-icon" viewBox="0 0 24 24" fill="currentColor">
+                        <polygon points="5 3 19 12 5 21 5 3" />
+                    </svg>
+                    <svg id="pause-icon" viewBox="0 0 24 24" fill="currentColor" style="display: none;">
+                        <rect x="6" y="4" width="4" height="16" />
+                        <rect x="14" y="4" width="4" height="16" />
+                    </svg>
+                </button>
+
+                <button id="skip-forward" class="control-btn" title="Forward 30s">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="13 19 22 12 13 5 13 19" />
+                        <line x1="2" y1="12" x2="13" y2="12" />
+                    </svg>
+                    <span>30</span>
+                </button>
+
+                <button id="bookmark-btn" class="control-btn" title="Add Bookmark">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                    </svg>
+                </button>
+
+                <div class="speed-control">
+                    <button id="speed-btn" class="control-btn">
+                        <span id="speed-value">1.0x</span>
+                    </button>
+                    <div id="speed-menu" class="speed-menu">
+                        <button data-speed="0.5">0.5x</button>
+                        <button data-speed="0.75">0.75x</button>
+                        <button data-speed="1" class="active">1.0x</button>
+                        <button data-speed="1.25">1.25x</button>
+                        <button data-speed="1.5">1.5x</button>
+                        <button data-speed="2">2.0x</button>
+                    </div>
+                </div>
+            </div>
+        </footer>
+
+        <!-- Bookmarks Panel -->
+        <div id="bookmarks-panel" class="side-panel">
+            <div class="panel-content">
+                <div class="panel-header">
+                    <h2>Bookmarks & Notes</h2>
+                    <button id="close-bookmarks" class="close-panel-btn">×</button>
+                </div>
+                <div id="bookmarks-list" class="bookmarks-list">
+                    <p class="empty-message">No bookmarks yet. Click the bookmark button while listening to add one.</p>
+                </div>
+                <hr class="panel-divider">
+                <h3>Notes</h3>
+                <div id="notes-list" class="notes-list">
+                    <p class="empty-message">No notes yet. Select text to add a note.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search Modal -->
+        <div id="search-modal" class="modal">
+            <div class="modal-content search-modal-content">
+                <div class="modal-header">
+                    <h2>Search in Book</h2>
+                    <button id="close-search" class="close-modal-btn">×</button>
+                </div>
+                <div class="search-input-container">
+                    <input type="text" id="search-input" placeholder="Search for text..." autocomplete="off">
+                    <button id="search-submit" class="search-submit-btn">Search</button>
+                </div>
+                <div id="search-results" class="search-results">
+                    <p class="empty-message">Enter a search term above.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sleep Timer Modal -->
+        <div id="sleep-timer-modal" class="modal">
+            <div class="modal-content timer-modal-content">
+                <div class="modal-header">
+                    <h2>Sleep Timer</h2>
+                    <button id="close-sleep-timer" class="close-modal-btn">×</button>
+                </div>
+                <div class="timer-options">
+                    <button data-minutes="5">5 minutes</button>
+                    <button data-minutes="10">10 minutes</button>
+                    <button data-minutes="15">15 minutes</button>
+                    <button data-minutes="30">30 minutes</button>
+                    <button data-minutes="60">1 hour</button>
+                    <button data-minutes="chapter">End of chapter</button>
+                    <button data-minutes="0" class="cancel-timer">Cancel Timer</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notes Modal -->
+        <div id="notes-modal" class="modal">
+            <div class="modal-content notes-modal-content">
+                <div class="modal-header">
+                    <h2>Add Note</h2>
+                    <button id="close-notes" class="close-modal-btn">×</button>
+                </div>
+                <div class="selected-text-preview" id="selected-text-preview"></div>
+                <textarea id="note-input" placeholder="Write your note here..."></textarea>
+                <div class="modal-actions">
+                    <button id="save-note" class="primary-btn">Save Note</button>
+                    <button id="highlight-only" class="secondary-btn">Highlight Only</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Panel -->
+        <div id="settings-panel" class="settings-panel">
+            <div class="settings-content">
+                <h2>Settings</h2>
+
+                <div class="setting-group">
+                    <label>Font Size</label>
+                    <div class="font-size-controls">
+                        <button id="font-decrease">A-</button>
+                        <span id="font-size-value">18px</span>
+                        <button id="font-increase">A+</button>
+                    </div>
+                </div>
+
+                <div class="setting-group">
+                    <label>Theme</label>
+                    <div class="theme-options">
+                        <button data-theme="light" class="theme-btn active">Light</button>
+                        <button data-theme="sepia" class="theme-btn">Sepia</button>
+                        <button data-theme="dark" class="theme-btn">Dark</button>
+                    </div>
+                </div>
+
+                <div class="setting-group">
+                    <label>Auto-Scroll</label>
+                    <label class="toggle">
+                        <input type="checkbox" id="auto-scroll" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <button id="close-settings" class="close-btn">Close</button>
+            </div>
+        </div>
+
+        <!-- Toast Notification -->
+        <div id="toast" class="toast"></div>
+    </div>
+
+    <script src="reader.js"></script>
+    <script>
+        // Register service worker for offline support
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('Service Worker registered'))
+                    .catch(err => console.log('Service Worker registration failed:', err));
+            });
+        }
+    </script>
+</body>
+
+</html>
