@@ -214,6 +214,17 @@ class ChapterDetector:
                 unique_markers.append(marker)
         markers = unique_markers
 
+        # Check for pre-chapter content (preface, introduction, etc.)
+        if markers and markers[0]["start"] > min_length:
+            pre_chapter_text = text[:markers[0]["start"]].strip()
+            if len(pre_chapter_text) >= min_length:
+                chapters.append({
+                    "title": "Introduction",
+                    "start": 0,
+                    "end": markers[0]["start"],
+                    "text": pre_chapter_text,
+                })
+
         # Create chapters with end positions
         for i, marker in enumerate(markers):
             end = markers[i + 1]["start"] if i + 1 < len(markers) else len(text)

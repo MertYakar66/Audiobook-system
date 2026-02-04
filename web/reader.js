@@ -54,7 +54,7 @@ class ReadAlongReader {
 
         // Book catalog for URL-based loading
         this.booksCatalog = {
-            'the-intelligent-investor': '../output/readalong/the-intelligent-investor'
+            'the-intelligent-investor': '../output/readalong/The-Intelligent-Investor'
         };
 
         // Initialize

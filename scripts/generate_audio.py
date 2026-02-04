@@ -10,7 +10,26 @@ Professional-grade implementation with:
 - Voice validation and quality controls
 """
 
+# =============================================================================
+# CRITICAL: Thread constraints for Windows stability
+# Must be set BEFORE any PyTorch/NumPy/MKL imports to prevent system freezes
+# during long AVX-heavy TTS workloads. Force assignment (not setdefault) to
+# override any pre-existing values from Conda, IDE, or system environment.
+# =============================================================================
 import os
+
+# Force thread counts to prevent thread oversubscription
+# 8 threads = physical core count for Ryzen 7 9800X3D
+os.environ["OMP_NUM_THREADS"] = "8"
+os.environ["MKL_NUM_THREADS"] = "8"
+os.environ["NUMEXPR_MAX_THREADS"] = "8"
+
+# Prevent busy-waiting which can cause scheduler issues
+os.environ["OMP_WAIT_POLICY"] = "PASSIVE"
+
+# NOTE: Do NOT set MKL_THREADING_LAYER on Windows - it can cause hangs
+# if it mismatches the OpenMP runtime bundled with PyTorch.
+
 import subprocess
 import tempfile
 import time
@@ -21,8 +40,18 @@ import numpy as np
 import soundfile as sf
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
 
+# Import torch early and set thread limits immediately
+import torch
+torch.set_num_threads(8)       # Intra-op parallelism (physical cores)
+torch.set_num_interop_threads(4)  # Inter-op parallelism
+
 from scripts.utils.config import config
 from scripts.utils import logger
+
+# Diagnostic print (runs once at module load)
+logger.info(f"Thread settings: OMP={os.environ.get('OMP_NUM_THREADS')}, "
+            f"MKL={os.environ.get('MKL_NUM_THREADS')}, "
+            f"torch={torch.get_num_threads()}/{torch.get_num_interop_threads()}")
 
 
 class VoiceNotFoundError(Exception):

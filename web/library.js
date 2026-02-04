@@ -9,12 +9,12 @@
 const BOOKS_CATALOG = [
     {
         id: "the-intelligent-investor",
-        path: "../output/readalong/the-intelligent-investor",
+        path: "../output/readalong/The-Intelligent-Investor",
         title: "The Intelligent Investor",
         author: "Benjamin Graham",
-        cover: "../output/readalong/the-intelligent-investor/cover.jpg",
-        totalDuration: 52049, // seconds
-        chapterCount: 34
+        cover: "../output/readalong/The-Intelligent-Investor/cover.jpg",
+        totalDuration: 79196, // seconds
+        chapterCount: 22
     }
 ];
 
