@@ -1,12 +1,14 @@
 /**
- * Read-Along Reader - Enhanced Version
+ * Read-Along Reader - Professional Edition
  *
  * Synchronized audio-text playback with:
  * - Sentence highlighting and tap-to-seek
- * - Bookmarks and notes
+ * - Professional bookmarks and notes
+ * - Multi-color highlighting
  * - Search inside book
  * - Sleep timer
- * - Progress persistence
+ * - Progress persistence with resume
+ * - Mobile-optimized with touch gestures
  * - Offline support (PWA)
  */
 
@@ -36,6 +38,16 @@ class ReadAlongReader {
         this.notes = [];
         this.highlights = [];
 
+        // Highlight colors
+        this.highlightColors = [
+            { name: 'yellow', color: '#fff59d' },
+            { name: 'green', color: '#c8e6c9' },
+            { name: 'blue', color: '#bbdefb' },
+            { name: 'pink', color: '#f8bbd9' },
+            { name: 'orange', color: '#ffcc80' }
+        ];
+        this.selectedHighlightColor = 'yellow';
+
         // Sleep timer
         this.sleepTimer = null;
         this.sleepTimerEnd = null;
@@ -44,6 +56,13 @@ class ReadAlongReader {
         // Selection for notes
         this.selectedText = null;
         this.selectedSentenceId = null;
+        this.selectionRange = null;
+
+        // Mobile/touch state
+        this.isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        this.touchStartX = 0;
+        this.touchStartY = 0;
+        this.wakeLock = null;
 
         // DOM Elements
         this.audio = document.getElementById('audio');
@@ -80,9 +99,282 @@ class ReadAlongReader {
         // Initialize
         this.bindEvents();
         this.loadSettings();
+        this.setupMobileFeatures();
+        this.createSelectionToolbar();
 
         // Check for book in URL
         this.checkUrlForBook();
+    }
+
+    /**
+     * Setup mobile-specific features
+     */
+    setupMobileFeatures() {
+        if (this.isMobile) {
+            document.body.classList.add('mobile-device');
+
+            // Request wake lock when playing
+            this.audio.addEventListener('play', () => this.requestWakeLock());
+            this.audio.addEventListener('pause', () => this.releaseWakeLock());
+
+            // Touch gestures for page viewer
+            const pageViewer = document.getElementById('page-viewer');
+            if (pageViewer) {
+                pageViewer.addEventListener('touchstart', (e) => this.handleTouchStart(e), { passive: true });
+                pageViewer.addEventListener('touchend', (e) => this.handleTouchEnd(e), { passive: true });
+            }
+
+            // Swipe gestures for chapter navigation
+            this.textContent.addEventListener('touchstart', (e) => this.handleTouchStart(e), { passive: true });
+            this.textContent.addEventListener('touchend', (e) => this.handleSwipeEnd(e), { passive: true });
+        }
+    }
+
+    /**
+     * Request screen wake lock for mobile
+     */
+    async requestWakeLock() {
+        if ('wakeLock' in navigator && !this.wakeLock) {
+            try {
+                this.wakeLock = await navigator.wakeLock.request('screen');
+                this.wakeLock.addEventListener('release', () => {
+                    this.wakeLock = null;
+                });
+            } catch (err) {
+                console.log('Wake lock request failed:', err);
+            }
+        }
+    }
+
+    /**
+     * Release screen wake lock
+     */
+    releaseWakeLock() {
+        if (this.wakeLock) {
+            this.wakeLock.release();
+            this.wakeLock = null;
+        }
+    }
+
+    /**
+     * Handle touch start
+     */
+    handleTouchStart(e) {
+        this.touchStartX = e.touches[0].clientX;
+        this.touchStartY = e.touches[0].clientY;
+    }
+
+    /**
+     * Handle touch end for page swipe
+     */
+    handleTouchEnd(e) {
+        if (!this.splitView) return;
+
+        const touchEndX = e.changedTouches[0].clientX;
+        const touchEndY = e.changedTouches[0].clientY;
+        const deltaX = touchEndX - this.touchStartX;
+        const deltaY = touchEndY - this.touchStartY;
+
+        // Only handle horizontal swipes
+        if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
+            if (deltaX > 0) {
+                this.prevPage();
+            } else {
+                this.nextPage();
+            }
+        }
+    }
+
+    /**
+     * Handle swipe for chapter navigation
+     */
+    handleSwipeEnd(e) {
+        const touchEndX = e.changedTouches[0].clientX;
+        const touchEndY = e.changedTouches[0].clientY;
+        const deltaX = touchEndX - this.touchStartX;
+        const deltaY = touchEndY - this.touchStartY;
+
+        // Only handle significant horizontal swipes at edges
+        if (Math.abs(deltaX) > 100 && Math.abs(deltaX) > Math.abs(deltaY) * 2) {
+            // Swipe right from left edge = previous chapter
+            if (deltaX > 0 && this.touchStartX < 50 && this.currentChapter > 0) {
+                this.loadChapter(this.currentChapter - 1);
+                this.showToast('Previous chapter');
+            }
+            // Swipe left from right edge = next chapter
+            else if (deltaX < 0 && this.touchStartX > window.innerWidth - 50) {
+                if (this.currentChapter < this.timingData.chapters.length - 1) {
+                    this.loadChapter(this.currentChapter + 1);
+                    this.showToast('Next chapter');
+                }
+            }
+        }
+    }
+
+    /**
+     * Create floating selection toolbar
+     */
+    createSelectionToolbar() {
+        // Create toolbar element
+        const toolbar = document.createElement('div');
+        toolbar.id = 'selection-toolbar';
+        toolbar.className = 'selection-toolbar';
+        toolbar.innerHTML = `
+            <div class="toolbar-colors">
+                ${this.highlightColors.map(c =>
+                    `<button class="color-btn" data-color="${c.name}" style="background: ${c.color}" title="Highlight ${c.name}"></button>`
+                ).join('')}
+            </div>
+            <div class="toolbar-actions">
+                <button class="toolbar-btn" id="toolbar-highlight" title="Highlight">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                    </svg>
+                </button>
+                <button class="toolbar-btn" id="toolbar-note" title="Add Note">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="16" y1="13" x2="8" y2="13"/>
+                        <line x1="16" y1="17" x2="8" y2="17"/>
+                    </svg>
+                </button>
+                <button class="toolbar-btn" id="toolbar-copy" title="Copy">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                    </svg>
+                </button>
+            </div>
+        `;
+        document.body.appendChild(toolbar);
+
+        // Bind toolbar events
+        toolbar.querySelectorAll('.color-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.selectedHighlightColor = btn.dataset.color;
+                toolbar.querySelectorAll('.color-btn').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+            });
+        });
+
+        // Set default color
+        toolbar.querySelector('.color-btn[data-color="yellow"]').classList.add('selected');
+
+        document.getElementById('toolbar-highlight').addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.addHighlightFromToolbar();
+        });
+
+        document.getElementById('toolbar-note').addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.hideSelectionToolbar();
+            if (this.selectedText) {
+                this.openNotesModal(this.selectedText);
+            }
+        });
+
+        document.getElementById('toolbar-copy').addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.copySelectedText();
+        });
+
+        this.selectionToolbar = toolbar;
+    }
+
+    /**
+     * Show selection toolbar near selection
+     */
+    showSelectionToolbar(x, y) {
+        const toolbar = this.selectionToolbar;
+        const toolbarWidth = 220;
+        const toolbarHeight = 80;
+
+        // Position toolbar above selection
+        let posX = x - toolbarWidth / 2;
+        let posY = y - toolbarHeight - 10;
+
+        // Keep within viewport
+        posX = Math.max(10, Math.min(posX, window.innerWidth - toolbarWidth - 10));
+        posY = Math.max(10, posY);
+
+        // If not enough space above, show below
+        if (posY < 10) {
+            posY = y + 20;
+        }
+
+        toolbar.style.left = `${posX}px`;
+        toolbar.style.top = `${posY}px`;
+        toolbar.classList.add('visible');
+    }
+
+    /**
+     * Hide selection toolbar
+     */
+    hideSelectionToolbar() {
+        if (this.selectionToolbar) {
+            this.selectionToolbar.classList.remove('visible');
+        }
+    }
+
+    /**
+     * Add highlight from toolbar
+     */
+    addHighlightFromToolbar() {
+        if (!this.selectedSentenceId || !this.bookData) return;
+
+        const highlight = {
+            id: Date.now().toString(),
+            bookId: this.bookData.bookId,
+            chapter: this.currentChapter,
+            sentenceId: this.selectedSentenceId,
+            text: this.selectedText,
+            color: this.selectedHighlightColor,
+            createdAt: new Date().toISOString()
+        };
+
+        this.highlights.push(highlight);
+        this.saveBookData();
+        this.hideSelectionToolbar();
+        this.renderHighlights();
+
+        // Apply highlight style
+        const el = document.querySelector(`[data-id="${this.selectedSentenceId}"]`);
+        if (el) {
+            el.classList.add('highlighted');
+            el.dataset.highlightColor = this.selectedHighlightColor;
+            const colorObj = this.highlightColors.find(c => c.name === this.selectedHighlightColor);
+            if (colorObj) {
+                el.style.backgroundColor = colorObj.color;
+            }
+        }
+
+        window.getSelection().removeAllRanges();
+        this.showToast(`Highlighted in ${this.selectedHighlightColor}`);
+    }
+
+    /**
+     * Copy selected text to clipboard
+     */
+    async copySelectedText() {
+        if (this.selectedText) {
+            try {
+                await navigator.clipboard.writeText(this.selectedText);
+                this.showToast('Copied to clipboard');
+            } catch (err) {
+                // Fallback for older browsers
+                const textarea = document.createElement('textarea');
+                textarea.value = this.selectedText;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                this.showToast('Copied to clipboard');
+            }
+        }
+        this.hideSelectionToolbar();
+        window.getSelection().removeAllRanges();
     }
 
     /**
@@ -234,6 +526,27 @@ class ReadAlongReader {
             document.getElementById('bookmarks-panel').classList.remove('open');
         });
 
+        // Panel tabs
+        document.querySelectorAll('.panel-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Update active tab
+                document.querySelectorAll('.panel-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+
+                // Show corresponding content
+                const tabName = tab.dataset.tab;
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+                document.getElementById(`${tabName}-tab`).classList.add('active');
+            });
+        });
+
+        // Export button
+        document.getElementById('export-notes-btn')?.addEventListener('click', () => {
+            this.exportNotesAndHighlights();
+        });
+
         // Add bookmark button
         document.getElementById('bookmark-btn').addEventListener('click', () => {
             this.addBookmark();
@@ -295,6 +608,10 @@ class ReadAlongReader {
             }
             if (!e.target.closest('.side-panel') && !e.target.closest('#menu-btn')) {
                 document.getElementById('bookmarks-panel').classList.remove('open');
+            }
+            // Hide selection toolbar when clicking outside
+            if (!e.target.closest('.selection-toolbar') && !e.target.closest('.sentence')) {
+                this.hideSelectionToolbar();
             }
         });
 
@@ -428,9 +745,10 @@ class ReadAlongReader {
             this.loadChapter(0);
         }
 
-        // Render bookmarks
+        // Render bookmarks, notes, highlights
         this.renderBookmarks();
         this.renderNotes();
+        this.renderHighlights();
     }
 
     /**
@@ -509,17 +827,29 @@ class ReadAlongReader {
                 sentenceEl.dataset.id = sentence.id;
                 sentenceEl.textContent = sentence.text + ' ';
 
-                // Check if has note or highlight
-                if (this.notes.some(n => n.sentenceId === sentence.id)) {
+                // Check if has note
+                const note = this.notes.find(n => n.sentenceId === sentence.id);
+                if (note) {
                     sentenceEl.classList.add('has-note');
                 }
-                if (this.highlights.some(h => h.sentenceId === sentence.id)) {
+
+                // Check if has highlight and apply color
+                const highlight = this.highlights.find(h => h.sentenceId === sentence.id);
+                if (highlight) {
                     sentenceEl.classList.add('highlighted');
+                    sentenceEl.dataset.highlightColor = highlight.color || 'yellow';
+                    const colorObj = this.highlightColors.find(c => c.name === (highlight.color || 'yellow'));
+                    if (colorObj) {
+                        sentenceEl.style.backgroundColor = colorObj.color;
+                    }
                 }
 
-                // Click to seek
-                sentenceEl.addEventListener('click', () => {
-                    this.seekToSentence(sentence.id);
+                // Click to seek (but not when selecting text)
+                sentenceEl.addEventListener('click', (e) => {
+                    // Only seek if not selecting text
+                    if (!window.getSelection().toString().trim()) {
+                        this.seekToSentence(sentence.id);
+                    }
                 });
 
                 paraEl.appendChild(sentenceEl);
@@ -936,8 +1266,24 @@ class ReadAlongReader {
             if (node && node.classList?.contains('sentence')) {
                 this.selectedText = text;
                 this.selectedSentenceId = node.dataset.id;
-                this.openNotesModal(text);
+                this.selectionRange = selection.getRangeAt(0).cloneRange();
+
+                // Get position for toolbar
+                const range = selection.getRangeAt(0);
+                const rect = range.getBoundingClientRect();
+                const x = rect.left + rect.width / 2;
+                const y = rect.top + window.scrollY;
+
+                // Show floating toolbar instead of modal
+                this.showSelectionToolbar(x, rect.top);
             }
+        } else {
+            // Hide toolbar if no selection
+            setTimeout(() => {
+                if (!window.getSelection().toString().trim()) {
+                    this.hideSelectionToolbar();
+                }
+            }, 100);
         }
     }
 
@@ -988,10 +1334,10 @@ class ReadAlongReader {
     }
 
     /**
-     * Add highlight only (no note text)
+     * Add highlight only (no note text) - from notes modal
      */
     addHighlight() {
-        if (!this.selectedSentenceId) return;
+        if (!this.selectedSentenceId || !this.bookData) return;
 
         const highlight = {
             id: Date.now().toString(),
@@ -999,18 +1345,27 @@ class ReadAlongReader {
             chapter: this.currentChapter,
             sentenceId: this.selectedSentenceId,
             text: this.selectedText,
+            color: this.selectedHighlightColor,
             createdAt: new Date().toISOString()
         };
 
         this.highlights.push(highlight);
         this.saveBookData();
         this.closeNotesModal();
+        this.renderHighlights();
 
-        // Update sentence styling
+        // Update sentence styling with color
         const el = document.querySelector(`[data-id="${this.selectedSentenceId}"]`);
-        if (el) el.classList.add('highlighted');
+        if (el) {
+            el.classList.add('highlighted');
+            el.dataset.highlightColor = this.selectedHighlightColor;
+            const colorObj = this.highlightColors.find(c => c.name === this.selectedHighlightColor);
+            if (colorObj) {
+                el.style.backgroundColor = colorObj.color;
+            }
+        }
 
-        this.showToast('Highlight added');
+        this.showToast(`Highlighted in ${this.selectedHighlightColor}`);
     }
 
     /**
@@ -1043,8 +1398,10 @@ class ReadAlongReader {
         container.innerHTML = bookNotes.map(n => `
             <div class="note-item" data-id="${n.id}">
                 <button class="note-delete" onclick="event.stopPropagation(); reader.removeNote('${n.id}')">Delete</button>
-                <div class="note-text">"${n.selectedText.substring(0, 50)}${n.selectedText.length > 50 ? '...' : ''}"</div>
+                <div class="note-chapter">Chapter ${n.chapter + 1}</div>
+                <div class="note-text">"${n.selectedText.substring(0, 80)}${n.selectedText.length > 80 ? '...' : ''}"</div>
                 <div class="note-content">${n.note}</div>
+                <div class="note-date">${new Date(n.createdAt).toLocaleDateString()}</div>
             </div>
         `).join('');
 
@@ -1068,6 +1425,119 @@ class ReadAlongReader {
                 }
             });
         });
+    }
+
+    /**
+     * Render highlights list
+     */
+    renderHighlights() {
+        const container = document.getElementById('highlights-list');
+        if (!container) return;
+
+        const bookHighlights = this.highlights.filter(h => h.bookId === this.bookData?.bookId);
+
+        if (bookHighlights.length === 0) {
+            container.innerHTML = '<p class="empty-message">No highlights yet. Select text to highlight.</p>';
+            return;
+        }
+
+        container.innerHTML = bookHighlights.map(h => {
+            const colorObj = this.highlightColors.find(c => c.name === (h.color || 'yellow'));
+            const bgColor = colorObj ? colorObj.color : '#fff59d';
+            return `
+                <div class="highlight-item" data-id="${h.id}" style="border-left: 4px solid ${bgColor}">
+                    <button class="highlight-delete" onclick="event.stopPropagation(); reader.removeHighlight('${h.id}')">Delete</button>
+                    <div class="highlight-chapter">Chapter ${h.chapter + 1}</div>
+                    <div class="highlight-text" style="background: ${bgColor}">"${h.text.substring(0, 100)}${h.text.length > 100 ? '...' : ''}"</div>
+                    <div class="highlight-date">${new Date(h.createdAt).toLocaleDateString()}</div>
+                </div>
+            `;
+        }).join('');
+
+        // Add click handlers
+        container.querySelectorAll('.highlight-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const highlight = this.highlights.find(h => h.id === item.dataset.id);
+                if (highlight) {
+                    if (highlight.chapter !== this.currentChapter) {
+                        this.loadChapter(highlight.chapter);
+                    }
+                    setTimeout(() => {
+                        const el = document.querySelector(`[data-id="${highlight.sentenceId}"]`);
+                        if (el) {
+                            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            el.classList.add('flash');
+                            setTimeout(() => el.classList.remove('flash'), 1500);
+                        }
+                    }, 500);
+                    document.getElementById('bookmarks-panel').classList.remove('open');
+                }
+            });
+        });
+    }
+
+    /**
+     * Remove a highlight
+     */
+    removeHighlight(id) {
+        const highlight = this.highlights.find(h => h.id === id);
+        if (highlight) {
+            const el = document.querySelector(`[data-id="${highlight.sentenceId}"]`);
+            if (el) {
+                el.classList.remove('highlighted');
+                el.style.backgroundColor = '';
+                delete el.dataset.highlightColor;
+            }
+        }
+        this.highlights = this.highlights.filter(h => h.id !== id);
+        this.saveBookData();
+        this.renderHighlights();
+        this.showToast('Highlight removed');
+    }
+
+    /**
+     * Export notes and highlights
+     */
+    exportNotesAndHighlights() {
+        if (!this.bookData) return;
+
+        const bookNotes = this.notes.filter(n => n.bookId === this.bookData.bookId);
+        const bookHighlights = this.highlights.filter(h => h.bookId === this.bookData.bookId);
+
+        let content = `# Notes and Highlights\n`;
+        content += `## ${this.bookData.title}\n`;
+        content += `By ${this.bookData.author}\n`;
+        content += `Exported: ${new Date().toLocaleDateString()}\n\n`;
+
+        if (bookHighlights.length > 0) {
+            content += `## Highlights (${bookHighlights.length})\n\n`;
+            bookHighlights.forEach((h, i) => {
+                content += `${i + 1}. "${h.text}"\n`;
+                content += `   - Chapter ${h.chapter + 1}, ${new Date(h.createdAt).toLocaleDateString()}\n\n`;
+            });
+        }
+
+        if (bookNotes.length > 0) {
+            content += `## Notes (${bookNotes.length})\n\n`;
+            bookNotes.forEach((n, i) => {
+                content += `${i + 1}. "${n.selectedText}"\n`;
+                content += `   Note: ${n.note}\n`;
+                content += `   - Chapter ${n.chapter + 1}, ${new Date(n.createdAt).toLocaleDateString()}\n\n`;
+            });
+        }
+
+        // Download as file
+        const blob = new Blob([content], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${this.bookData.title.replace(/[^a-z0-9]/gi, '_')}_notes.md`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        this.showToast('Notes exported');
     }
 
     // ==================== SEARCH ====================

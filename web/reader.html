@@ -189,13 +189,45 @@
                     <h2>Bookmarks & Notes</h2>
                     <button id="close-bookmarks" class="close-panel-btn">×</button>
                 </div>
-                <div id="bookmarks-list" class="bookmarks-list">
-                    <p class="empty-message">No bookmarks yet. Click the bookmark button while listening to add one.</p>
+
+                <!-- Tab Navigation -->
+                <div class="panel-tabs">
+                    <button class="panel-tab active" data-tab="bookmarks">Bookmarks</button>
+                    <button class="panel-tab" data-tab="highlights">Highlights</button>
+                    <button class="panel-tab" data-tab="notes">Notes</button>
                 </div>
-                <hr class="panel-divider">
-                <h3>Notes</h3>
-                <div id="notes-list" class="notes-list">
-                    <p class="empty-message">No notes yet. Select text to add a note.</p>
+
+                <!-- Bookmarks Tab -->
+                <div id="bookmarks-tab" class="tab-content active">
+                    <div id="bookmarks-list" class="bookmarks-list">
+                        <p class="empty-message">No bookmarks yet. Click the bookmark button while listening to add one.</p>
+                    </div>
+                </div>
+
+                <!-- Highlights Tab -->
+                <div id="highlights-tab" class="tab-content">
+                    <div id="highlights-list" class="highlights-list">
+                        <p class="empty-message">No highlights yet. Select text to highlight.</p>
+                    </div>
+                </div>
+
+                <!-- Notes Tab -->
+                <div id="notes-tab" class="tab-content">
+                    <div id="notes-list" class="notes-list">
+                        <p class="empty-message">No notes yet. Select text to add a note.</p>
+                    </div>
+                </div>
+
+                <!-- Export Button -->
+                <div class="panel-footer">
+                    <button id="export-notes-btn" class="secondary-btn export-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                        Export All
+                    </button>
                 </div>
             </div>
         </div>

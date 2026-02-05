@@ -1262,9 +1262,365 @@ body {
     }
 }
 
+/* ==================== Selection Toolbar ==================== */
+
+.selection-toolbar {
+    position: fixed;
+    z-index: 500;
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(10px);
+    transition: all 0.2s ease;
+}
+
+.selection-toolbar.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.toolbar-colors {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    padding: 4px;
+}
+
+.toolbar-colors .color-btn {
+    width: 28px;
+    height: 28px;
+    border: 2px solid transparent;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.toolbar-colors .color-btn:hover {
+    transform: scale(1.15);
+}
+
+.toolbar-colors .color-btn.selected {
+    border-color: var(--text-color);
+    transform: scale(1.1);
+}
+
+.toolbar-actions {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    border-top: 1px solid var(--border-color);
+    padding-top: 8px;
+}
+
+.toolbar-btn {
+    width: 40px;
+    height: 36px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-color);
+    transition: background 0.2s;
+}
+
+.toolbar-btn:hover {
+    background: var(--header-bg);
+}
+
+.toolbar-btn svg {
+    width: 18px;
+    height: 18px;
+}
+
+/* ==================== Panel Tabs ==================== */
+
+.panel-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 1rem;
+}
+
+.panel-tab {
+    flex: 1;
+    padding: 0.75rem 0.5rem;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    font-family: system-ui, sans-serif;
+}
+
+.panel-tab:hover {
+    color: var(--text-color);
+}
+
+.panel-tab.active {
+    color: var(--button-bg);
+    border-bottom-color: var(--button-bg);
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* ==================== Highlights List ==================== */
+
+.highlights-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.highlight-item {
+    padding: 0.75rem;
+    background: var(--header-bg);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+}
+
+.highlight-item:hover {
+    background: var(--border-color);
+}
+
+.highlight-chapter {
+    font-size: 0.75rem;
+    color: var(--button-bg);
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.highlight-text {
+    font-size: 0.9rem;
+    padding: 4px 8px;
+    border-radius: 4px;
+    margin: 0.25rem 0;
+}
+
+.highlight-date, .note-date {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    margin-top: 0.5rem;
+}
+
+.note-chapter {
+    font-size: 0.75rem;
+    color: var(--button-bg);
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.highlight-delete {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: none;
+    border: none;
+    color: #e74c3c;
+    cursor: pointer;
+    font-size: 0.75rem;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.highlight-item:hover .highlight-delete {
+    opacity: 1;
+}
+
+/* ==================== Panel Footer ==================== */
+
+.panel-footer {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.export-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.export-btn svg {
+    flex-shrink: 0;
+}
+
+/* ==================== Flash Animation ==================== */
+
+@keyframes flash-highlight {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.sentence.flash {
+    animation: flash-highlight 0.3s ease-in-out 3;
+}
+
+/* ==================== Mobile Optimizations ==================== */
+
+/* Touch-friendly tap targets */
+.mobile-device .sentence {
+    padding: 4px 6px;
+    margin: 0 -6px;
+}
+
+.mobile-device .control-btn {
+    min-width: 48px;
+    min-height: 48px;
+}
+
+.mobile-device .play-btn {
+    width: 64px;
+    height: 64px;
+}
+
+/* Bottom navigation hint for mobile */
+.mobile-device .content::after {
+    content: '';
+    display: block;
+    height: 20px;
+}
+
+/* Improved touch scrolling */
+.mobile-device .text-content {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+}
+
+/* Page viewer touch improvements */
+.mobile-device .page-viewer {
+    touch-action: pan-x pan-y pinch-zoom;
+}
+
+/* Larger page controls on mobile */
+.mobile-device .page-nav-btn,
+.mobile-device .page-zoom-btn {
+    width: 44px;
+    height: 44px;
+    font-size: 1.4rem;
+}
+
+/* Selection toolbar mobile positioning */
+@media (max-width: 600px) {
+    .selection-toolbar {
+        left: 10px !important;
+        right: 10px !important;
+        width: auto !important;
+    }
+
+    .toolbar-colors {
+        flex-wrap: wrap;
+    }
+
+    .toolbar-colors .color-btn {
+        width: 36px;
+        height: 36px;
+    }
+
+    .toolbar-btn {
+        width: 48px;
+        height: 44px;
+    }
+
+    .toolbar-btn svg {
+        width: 22px;
+        height: 22px;
+    }
+}
+
+/* Side panel full screen on mobile */
+@media (max-width: 600px) {
+    .side-panel {
+        width: 100%;
+        left: -100%;
+    }
+
+    .panel-tabs {
+        position: sticky;
+        top: 0;
+        background: var(--bg-color);
+        z-index: 10;
+    }
+
+    .panel-tab {
+        padding: 1rem 0.5rem;
+    }
+}
+
+/* Continue reading banner */
+.continue-reading-banner {
+    position: fixed;
+    bottom: calc(var(--player-height) + 10px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--button-bg);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 30px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+    z-index: 150;
+    transition: all 0.3s ease;
+}
+
+.continue-reading-banner:hover {
+    transform: translateX(-50%) scale(1.02);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+
+.continue-reading-banner .banner-text {
+    font-family: system-ui, sans-serif;
+    font-size: 0.9rem;
+}
+
+.continue-reading-banner .banner-chapter {
+    font-size: 0.8rem;
+    opacity: 0.9;
+}
+
+.continue-reading-banner .banner-close {
+    background: none;
+    border: none;
+    color: white;
+    opacity: 0.7;
+    cursor: pointer;
+    padding: 4px;
+    font-size: 1.2rem;
+    line-height: 1;
+}
+
+.continue-reading-banner .banner-close:hover {
+    opacity: 1;
+}
+
 /* Print styles */
 @media print {
-    .header, .player, .settings-panel, .chapter-nav, .side-panel, .modal {
+    .header, .player, .settings-panel, .chapter-nav, .side-panel, .modal, .selection-toolbar {
         display: none !important;
     }
 
