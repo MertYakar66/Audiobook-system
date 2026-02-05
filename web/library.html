@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#007bff">
+    <meta name="description" content="Read-Along: Your personal audiobook library with synchronized text">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <link rel="manifest" href="manifest.json">
+    <title>Read-Along Library</title>
+    <link rel="stylesheet" href="library.css">
+</head>
+
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <span class="logo-icon">📖</span>
+                    <h1>Read-Along</h1>
+                </div>
+                <nav class="nav-tabs">
+                    <button class="nav-tab active" data-tab="library">Library</button>
+                    <button class="nav-tab" data-tab="continue">Continue Reading</button>
+                </nav>
+                <button id="settings-btn" class="icon-btn" title="Settings">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3" />
+                        <path
+                            d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="content">
+            <!-- Continue Reading Section -->
+            <section id="continue-section" class="section">
+                <h2>Continue Reading</h2>
+                <div id="continue-reading" class="continue-cards">
+                    <!-- Populated by JS -->
+                </div>
+            </section>
+
+            <!-- Library Section -->
+            <section id="library-section" class="section">
+                <div class="section-header">
+                    <h2>Your Library</h2>
+                    <span id="book-count" class="book-count">0 books</span>
+                </div>
+                <div id="library-grid" class="library-grid">
+                    <!-- Books populated by JS -->
+                </div>
+            </section>
+
+            <!-- Empty State -->
+            <div id="empty-state" class="empty-state" style="display: none;">
+                <div class="empty-icon">📚</div>
+                <h2>No Books Yet</h2>
+                <p>Process a book with the Read-Along CLI to add it to your library.</p>
+                <pre class="command-hint">python -m scripts.main readalong "your-book.txt"</pre>
+            </div>
+        </main>
+
+        <!-- Settings Panel -->
+        <div id="settings-panel" class="settings-panel">
+            <div class="settings-content">
+                <h2>Settings</h2>
+                <div class="setting-group">
+                    <label>Theme</label>
+                    <div class="theme-options">
+                        <button data-theme="light" class="theme-btn active">Light</button>
+                        <button data-theme="sepia" class="theme-btn">Sepia</button>
+                        <button data-theme="dark" class="theme-btn">Dark</button>
+                    </div>
+                </div>
+                <button id="close-settings" class="close-btn">Close</button>
+            </div>
+        </div>
+
+        <!-- Toast Notification -->
+        <div id="toast" class="toast"></div>
+    </div>
+
+    <script src="library.js"></script>
+</body>
+
+</html>

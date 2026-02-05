@@ -1,8 +1,13 @@
 /**
- * Read-Along Reader - Enhanced Edition
+ * Read-Along Reader - Enhanced Version
  *
- * Synchronized audio-text playback with sentence highlighting,
- * page viewer for original documents, bookmarks, and more.
+ * Synchronized audio-text playback with:
+ * - Sentence highlighting and tap-to-seek
+ * - Bookmarks and notes
+ * - Search inside book
+ * - Sleep timer
+ * - Progress persistence
+ * - Offline support (PWA)
  */
 
 class ReadAlongReader {
@@ -11,34 +16,28 @@ class ReadAlongReader {
         this.bookData = null;
         this.timingData = null;
         this.textData = null;
-        this.pagesData = null;
         this.currentChapter = 0;
         this.currentSentenceIndex = -1;
-        this.currentPage = 1;
-        this.totalPages = 0;
-        this.pageZoom = 1.0;
         this.isPlaying = false;
         this.playbackSpeed = 1.0;
         this.autoScroll = true;
         this.fontSize = 18;
-        this.lineHeight = 1.7;
-        this.highlightStyle = 'background';
-        this.sleepTimer = null;
-        this.sleepTimeRemaining = 0;
+
+        // Bookmarks and Notes
         this.bookmarks = [];
-        this.splitView = false;
-        this.audioFiles = {};
-        this.pageFiles = {};
+        this.notes = [];
+        this.highlights = [];
+
+        // Sleep timer
+        this.sleepTimer = null;
+        this.sleepTimerEnd = null;
+        this.sleepTimerMode = null; // 'minutes' or 'chapter'
+
+        // Selection for notes
+        this.selectedText = null;
+        this.selectedSentenceId = null;
 
         // DOM Elements
-        this.initElements();
-
-        // Initialize
-        this.bindEvents();
-        this.loadSettings();
-    }
-
-    initElements() {
         this.audio = document.getElementById('audio');
         this.textContent = document.getElementById('text-content');
         this.playPauseBtn = document.getElementById('play-pause');
@@ -52,14 +51,75 @@ class ReadAlongReader {
         this.chapterSelect = document.getElementById('chapter-select');
         this.bookTitle = document.getElementById('book-title');
         this.bookAuthor = document.getElementById('book-author');
-        this.chapterTitleDisplay = document.getElementById('chapter-title-display');
-        this.pagePanel = document.getElementById('page-panel');
-        this.pageImage = document.getElementById('page-image');
-        this.pageIndicator = document.getElementById('page-indicator');
-        this.splitContainer = document.getElementById('split-container');
-        this.sleepTimerValue = document.getElementById('sleep-timer-value');
+
+        // Book catalog for URL-based loading
+        this.booksCatalog = {
+            'the-intelligent-investor': '../output/readalong/The-Intelligent-Investor'
+        };
+
+        // Initialize
+        this.bindEvents();
+        this.loadSettings();
+
+        // Check for book in URL
+        this.checkUrlForBook();
     }
 
+    /**
+     * Check URL for book parameter and load it
+     */
+    async checkUrlForBook() {
+        const params = new URLSearchParams(window.location.search);
+        const bookId = params.get('book');
+
+        if (bookId && this.booksCatalog[bookId]) {
+            await this.loadBookFromPath(this.booksCatalog[bookId]);
+        }
+    }
+
+    /**
+     * Load book from server path
+     */
+    async loadBookFromPath(basePath) {
+        try {
+            this.showLoading(true);
+
+            // Fetch manifest
+            const manifestResponse = await fetch(`${basePath}/manifest.json`);
+            if (!manifestResponse.ok) throw new Error('Book not found');
+            this.bookData = await manifestResponse.json();
+
+            // Fetch timing data
+            const timingResponse = await fetch(`${basePath}/${this.bookData.timing}`);
+            if (timingResponse.ok) {
+                this.timingData = await timingResponse.json();
+            }
+
+            // Fetch text data
+            const textResponse = await fetch(`${basePath}/${this.bookData.text}`);
+            if (textResponse.ok) {
+                this.textData = await textResponse.json();
+            }
+
+            // Store base path for audio files
+            this.audioBasePath = basePath;
+
+            // Load bookmarks and notes for this book
+            this.loadBookData();
+
+            // Initialize reader
+            this.initializeReader();
+
+        } catch (error) {
+            console.error('Error loading book:', error);
+            this.showToast('Error loading book: ' + error.message);
+            this.showLoading(false);
+        }
+    }
+
+    /**
+     * Bind all event listeners
+     */
     bindEvents() {
         // Audio events
         this.audio.addEventListener('timeupdate', () => this.onTimeUpdate());
@@ -76,12 +136,12 @@ class ReadAlongReader {
             this.audio.currentTime = Math.max(0, this.audio.currentTime - 10);
         });
         document.getElementById('skip-forward').addEventListener('click', () => {
-            this.audio.currentTime = Math.min(this.audio.duration || 0, this.audio.currentTime + 30);
+            this.audio.currentTime = Math.min(this.audio.duration, this.audio.currentTime + 30);
         });
 
         // Progress bar
         this.progressBar.addEventListener('click', (e) => this.seekTo(e));
-        this.progressBar.addEventListener('mousedown', (e) => this.startDragging(e));
+        this.progressBar.addEventListener('mousedown', () => this.startDragging());
 
         // Speed control
         document.getElementById('speed-btn').addEventListener('click', () => {
@@ -99,12 +159,12 @@ class ReadAlongReader {
             if (this.currentChapter > 0) this.loadChapter(this.currentChapter - 1);
         });
         document.getElementById('next-chapter').addEventListener('click', () => {
-            if (this.timingData && this.currentChapter < this.timingData.chapters.length - 1) {
+            if (this.currentChapter < this.timingData.chapters.length - 1) {
                 this.loadChapter(this.currentChapter + 1);
             }
         });
 
-        // Settings panel
+        // Settings
         document.getElementById('settings-btn').addEventListener('click', () => {
             document.getElementById('settings-panel').classList.add('open');
         });
@@ -120,19 +180,9 @@ class ReadAlongReader {
             this.setFontSize(this.fontSize + 2);
         });
 
-        // Line spacing
-        document.querySelectorAll('.spacing-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => this.setLineSpacing(parseFloat(e.target.dataset.spacing)));
-        });
-
         // Theme
         document.querySelectorAll('.theme-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => this.setTheme(e.currentTarget.dataset.theme));
-        });
-
-        // Highlight style
-        document.getElementById('highlight-style').addEventListener('change', (e) => {
-            this.setHighlightStyle(e.target.value);
+            btn.addEventListener('click', (e) => this.setTheme(e.target.dataset.theme));
         });
 
         // Auto-scroll toggle
@@ -141,35 +191,75 @@ class ReadAlongReader {
             this.saveSettings();
         });
 
-        // Reset settings
-        document.getElementById('reset-settings').addEventListener('click', () => this.resetSettings());
+        // Book selection (if elements exist - for backwards compatibility)
+        const selectBookBtn = document.getElementById('select-book-btn');
+        const folderInput = document.getElementById('folder-input');
+        if (selectBookBtn && folderInput) {
+            selectBookBtn.addEventListener('click', () => {
+                folderInput.click();
+            });
+            folderInput.addEventListener('change', (e) => {
+                this.handleFolderSelect(e.target.files);
+            });
+        }
 
-        // View mode toggle (split view)
-        document.getElementById('view-mode-btn').addEventListener('click', () => this.toggleSplitView());
+        // Bookmarks panel
+        document.getElementById('menu-btn').addEventListener('click', () => {
+            document.getElementById('bookmarks-panel').classList.toggle('open');
+        });
+        document.getElementById('close-bookmarks').addEventListener('click', () => {
+            document.getElementById('bookmarks-panel').classList.remove('open');
+        });
 
-        // Page navigation
-        document.getElementById('page-prev').addEventListener('click', () => this.prevPage());
-        document.getElementById('page-next').addEventListener('click', () => this.nextPage());
-        document.getElementById('page-zoom-in').addEventListener('click', () => this.zoomPage(0.2));
-        document.getElementById('page-zoom-out').addEventListener('click', () => this.zoomPage(-0.2));
+        // Add bookmark button
+        document.getElementById('bookmark-btn').addEventListener('click', () => {
+            this.addBookmark();
+        });
 
-        // Bookmarks
-        document.getElementById('bookmark-btn').addEventListener('click', () => this.showBookmarkModal());
-        document.getElementById('save-bookmark').addEventListener('click', () => this.saveBookmark());
-        document.getElementById('cancel-bookmark').addEventListener('click', () => this.hideBookmarkModal());
+        // Search
+        document.getElementById('search-btn').addEventListener('click', () => {
+            this.openSearchModal();
+        });
+        document.getElementById('close-search').addEventListener('click', () => {
+            this.closeSearchModal();
+        });
+        document.getElementById('search-submit').addEventListener('click', () => {
+            this.performSearch();
+        });
+        document.getElementById('search-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.performSearch();
+        });
 
         // Sleep timer
-        document.getElementById('sleep-timer').addEventListener('click', () => this.showSleepModal());
-        document.querySelectorAll('.sleep-options button').forEach(btn => {
-            btn.addEventListener('click', (e) => this.setSleepTimer(parseInt(e.target.dataset.minutes)));
+        document.getElementById('sleep-timer-btn').addEventListener('click', () => {
+            this.openSleepTimerModal();
+        });
+        document.getElementById('close-sleep-timer').addEventListener('click', () => {
+            this.closeSleepTimerModal();
+        });
+        document.querySelectorAll('.timer-options button').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const minutes = e.target.dataset.minutes;
+                this.setSleepTimer(minutes);
+            });
         });
 
-        // Book selection
-        document.getElementById('select-book-btn').addEventListener('click', () => {
-            document.getElementById('folder-input').click();
+        // Notes modal
+        document.getElementById('close-notes').addEventListener('click', () => {
+            this.closeNotesModal();
         });
-        document.getElementById('folder-input').addEventListener('change', (e) => {
-            this.handleFolderSelect(e.target.files);
+        document.getElementById('save-note').addEventListener('click', () => {
+            this.saveNote();
+        });
+        document.getElementById('highlight-only').addEventListener('click', () => {
+            this.addHighlight();
+        });
+
+        // Text selection for notes
+        document.addEventListener('mouseup', (e) => {
+            if (e.target.closest('.text-content')) {
+                this.handleTextSelection();
+            }
         });
 
         // Keyboard shortcuts
@@ -180,41 +270,34 @@ class ReadAlongReader {
             if (!e.target.closest('.speed-control')) {
                 document.getElementById('speed-menu').classList.remove('show');
             }
-            if (!e.target.closest('.settings-panel') && !e.target.closest('#settings-btn')) {
-                document.getElementById('settings-panel').classList.remove('open');
+            if (!e.target.closest('.side-panel') && !e.target.closest('#menu-btn')) {
+                document.getElementById('bookmarks-panel').classList.remove('open');
             }
         });
 
-        // Modal close on backdrop click
+        // Close modals on backdrop click
         document.querySelectorAll('.modal').forEach(modal => {
             modal.addEventListener('click', (e) => {
                 if (e.target === modal) {
-                    modal.classList.add('hidden');
+                    modal.classList.remove('open');
                 }
             });
         });
     }
 
+    /**
+     * Handle folder selection
+     */
     async handleFolderSelect(files) {
         const fileMap = {};
         for (const file of files) {
-            const relativePath = file.webkitRelativePath || file.name;
-            const fileName = relativePath.split('/').pop();
-            fileMap[fileName] = file;
-
-            // Also store with path for nested files
-            if (relativePath.includes('/')) {
-                const parts = relativePath.split('/');
-                if (parts.length >= 2) {
-                    const subPath = parts.slice(1).join('/');
-                    fileMap[subPath] = file;
-                }
-            }
+            fileMap[file.name] = file;
         }
 
+        // Look for manifest.json
         const manifestFile = fileMap['manifest.json'];
         if (!manifestFile) {
-            this.showToast('No manifest.json found. Please select a processed book folder.', 'error');
+            this.showToast('No manifest.json found. Please select a processed book folder.');
             return;
         }
 
@@ -226,55 +309,44 @@ class ReadAlongReader {
             this.bookData = JSON.parse(manifestText);
 
             // Read timing data
-            const timingFile = fileMap[this.bookData.timing] || fileMap['timing.json'];
+            const timingFile = fileMap[this.bookData.timing];
             if (timingFile) {
                 const timingText = await this.readFile(timingFile);
                 this.timingData = JSON.parse(timingText);
             }
 
             // Read text data
-            const textFile = fileMap[this.bookData.text] || fileMap['text.json'];
+            const textFile = fileMap[this.bookData.text];
             if (textFile) {
                 const textText = await this.readFile(textFile);
                 this.textData = JSON.parse(textText);
             }
 
-            // Read pages data if available
-            if (this.bookData.hasOriginalPages || this.bookData.pages) {
-                const pagesFile = fileMap[this.bookData.pages] || fileMap['pages.json'];
-                if (pagesFile) {
-                    const pagesText = await this.readFile(pagesFile);
-                    this.pagesData = JSON.parse(pagesText);
-                }
-            }
-
             // Store audio files reference
             this.audioFiles = {};
-            this.pageFiles = {};
-
             for (const [name, file] of Object.entries(fileMap)) {
                 if (name.endsWith('.wav') || name.endsWith('.mp3') || name.endsWith('.m4a')) {
                     this.audioFiles[name] = file;
                 }
-                if (name.endsWith('.jpg') || name.endsWith('.png') || name.endsWith('.jpeg')) {
-                    this.pageFiles[name] = file;
-                }
             }
 
-            // Load bookmarks for this book
-            this.loadBookmarks();
+            // Load bookmarks and notes for this book
+            this.loadBookData();
 
             // Initialize reader
             this.initializeReader();
 
         } catch (error) {
             console.error('Error loading book:', error);
-            this.showToast('Error loading book: ' + error.message, 'error');
+            this.showToast('Error loading book: ' + error.message);
         } finally {
             this.showLoading(false);
         }
     }
 
+    /**
+     * Read file as text
+     */
     readFile(file) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -284,6 +356,9 @@ class ReadAlongReader {
         });
     }
 
+    /**
+     * Initialize the reader with loaded book data
+     */
     initializeReader() {
         // Update header
         this.bookTitle.textContent = this.bookData.title;
@@ -294,42 +369,33 @@ class ReadAlongReader {
         this.timingData.chapters.forEach((chapter, index) => {
             const option = document.createElement('option');
             option.value = index;
-            option.textContent = `${index + 1}. ${chapter.title}`;
+            option.textContent = chapter.title;
             this.chapterSelect.appendChild(option);
         });
-
-        // Setup page viewer if pages available
-        if (this.pagesData) {
-            this.totalPages = this.pagesData.total_pages || this.pagesData.total_images || 0;
-            if (this.totalPages > 0) {
-                document.getElementById('view-mode-btn').style.display = 'flex';
-            }
-        }
 
         // Show reader view
         document.getElementById('empty-state').classList.remove('active');
         document.getElementById('reader-view').style.display = 'block';
         document.getElementById('player').style.display = 'block';
 
-        // Restore last position if available
-        const lastPosition = this.getLastPosition();
-        if (lastPosition) {
-            this.loadChapter(lastPosition.chapter);
-            setTimeout(() => {
-                this.audio.currentTime = lastPosition.time;
-            }, 500);
+        // Load saved progress or first chapter
+        const savedProgress = this.getSavedProgress();
+        if (savedProgress) {
+            this.loadChapter(savedProgress.chapter, savedProgress.position);
+            this.showToast('Resumed from where you left off');
         } else {
             this.loadChapter(0);
         }
 
-        this.showToast(`Loaded: ${this.bookData.title}`, 'success');
+        // Render bookmarks
+        this.renderBookmarks();
+        this.renderNotes();
     }
 
-    async loadChapter(chapterIndex) {
-        if (!this.timingData || chapterIndex < 0 || chapterIndex >= this.timingData.chapters.length) {
-            return;
-        }
-
+    /**
+     * Load a specific chapter
+     */
+    async loadChapter(chapterIndex, startPosition = 0) {
         this.currentChapter = chapterIndex;
         this.currentSentenceIndex = -1;
 
@@ -343,19 +409,34 @@ class ReadAlongReader {
         document.getElementById('prev-chapter').disabled = chapterIndex === 0;
         document.getElementById('next-chapter').disabled = chapterIndex === this.timingData.chapters.length - 1;
 
-        // Update chapter title display
-        this.chapterTitleDisplay.textContent = chapter.title;
-
         // Render text
         this.renderText(textChapter);
 
         // Load audio
         const audioFileName = chapter.audioFile.split('/').pop();
-        const audioFile = this.audioFiles[audioFileName] || this.audioFiles[`audio/${audioFileName}`];
 
-        if (audioFile) {
-            const audioUrl = URL.createObjectURL(audioFile);
+        // Check if loading from URL (audioBasePath) or from folder (audioFiles)
+        if (this.audioBasePath) {
+            // URL-based loading
+            this.audio.src = `${this.audioBasePath}/audio/${audioFileName}`;
+
+            // Wait for audio to load then seek
+            this.audio.addEventListener('loadedmetadata', () => {
+                if (startPosition > 0) {
+                    this.audio.currentTime = startPosition;
+                }
+            }, { once: true });
+        } else if (this.audioFiles && this.audioFiles[audioFileName]) {
+            // Folder-based loading
+            const audioUrl = URL.createObjectURL(this.audioFiles[audioFileName]);
             this.audio.src = audioUrl;
+
+            // Wait for audio to load then seek
+            this.audio.addEventListener('loadedmetadata', () => {
+                if (startPosition > 0) {
+                    this.audio.currentTime = startPosition;
+                }
+            }, { once: true });
         }
 
         // Reset progress
@@ -363,10 +444,16 @@ class ReadAlongReader {
         this.progressHandle.style.left = '0%';
         this.currentTimeEl.textContent = '0:00';
 
+        // Update bookmark markers
+        this.updateBookmarkMarkers();
+
         // Scroll to top
         this.textContent.scrollTop = 0;
     }
 
+    /**
+     * Render text content with sentence spans
+     */
     renderText(chapterData) {
         this.textContent.innerHTML = '';
 
@@ -381,6 +468,15 @@ class ReadAlongReader {
                 sentenceEl.dataset.id = sentence.id;
                 sentenceEl.textContent = sentence.text + ' ';
 
+                // Check if has note or highlight
+                if (this.notes.some(n => n.sentenceId === sentence.id)) {
+                    sentenceEl.classList.add('has-note');
+                }
+                if (this.highlights.some(h => h.sentenceId === sentence.id)) {
+                    sentenceEl.classList.add('highlighted');
+                }
+
+                // Click to seek
                 sentenceEl.addEventListener('click', () => {
                     this.seekToSentence(sentence.id);
                 });
@@ -392,73 +488,79 @@ class ReadAlongReader {
         });
     }
 
+    /**
+     * Handle audio time updates
+     */
     onTimeUpdate() {
         const currentTime = this.audio.currentTime;
         const duration = this.audio.duration || 0;
 
         // Update progress bar
-        if (duration > 0) {
-            const percent = (currentTime / duration) * 100;
-            this.progressFill.style.width = `${percent}%`;
-            this.progressHandle.style.left = `${percent}%`;
-        }
+        const percent = (currentTime / duration) * 100;
+        this.progressFill.style.width = `${percent}%`;
+        this.progressHandle.style.left = `${percent}%`;
 
         // Update time display
         this.currentTimeEl.textContent = this.formatTime(currentTime);
 
-        // Save position
-        this.savePosition();
-
         // Find and highlight current sentence
         this.highlightCurrentSentence(currentTime);
 
-        // Update sleep timer display
-        if (this.sleepTimer) {
-            this.updateSleepTimerDisplay();
-        }
+        // Save progress periodically
+        this.saveProgress();
+
+        // Check sleep timer
+        this.checkSleepTimer();
     }
 
+    /**
+     * Find and highlight the sentence at current time
+     */
     highlightCurrentSentence(currentTime) {
-        if (!this.timingData) return;
-
         const chapter = this.timingData.chapters[this.currentChapter];
-        if (!chapter) return;
-
         const entries = chapter.entries;
 
+        // Find current sentence
         let currentIndex = -1;
         for (let i = 0; i < entries.length; i++) {
             if (currentTime >= entries[i].start && currentTime < entries[i].end) {
                 currentIndex = i;
                 break;
             }
+            // If between sentences, highlight the upcoming one
             if (currentTime < entries[i].start) {
                 currentIndex = i > 0 ? i - 1 : -1;
                 break;
             }
         }
 
+        // Handle end of chapter
         if (currentIndex === -1 && entries.length > 0 && currentTime >= entries[entries.length - 1].start) {
             currentIndex = entries.length - 1;
         }
 
+        // Update highlighting if changed
         if (currentIndex !== this.currentSentenceIndex) {
             this.currentSentenceIndex = currentIndex;
             this.updateHighlighting();
         }
     }
 
+    /**
+     * Update sentence highlighting
+     */
     updateHighlighting() {
-        if (!this.timingData) return;
-
         const chapter = this.timingData.chapters[this.currentChapter];
-        if (!chapter) return;
-
         const entries = chapter.entries;
 
-        // Remove all highlights
-        document.querySelectorAll('.sentence.active, .sentence.played').forEach(el => {
-            el.classList.remove('active', 'played');
+        // Remove active class from all
+        document.querySelectorAll('.sentence.active').forEach(el => {
+            el.classList.remove('active');
+        });
+
+        // Update played state
+        document.querySelectorAll('.sentence.played').forEach(el => {
+            el.classList.remove('played');
         });
 
         // Apply new highlights
@@ -467,6 +569,7 @@ class ReadAlongReader {
             if (el) {
                 if (index === this.currentSentenceIndex) {
                     el.classList.add('active');
+                    // Auto-scroll
                     if (this.autoScroll && this.isPlaying) {
                         this.scrollToElement(el);
                     }
@@ -477,11 +580,15 @@ class ReadAlongReader {
         });
     }
 
+    /**
+     * Scroll to element smoothly
+     */
     scrollToElement(element) {
         const container = this.textContent;
         const elementRect = element.getBoundingClientRect();
         const containerRect = container.getBoundingClientRect();
 
+        // Check if element is out of view
         if (elementRect.top < containerRect.top + 100 || elementRect.bottom > containerRect.bottom - 100) {
             const scrollTop = element.offsetTop - container.offsetTop - (container.clientHeight / 3);
             container.scrollTo({
@@ -491,9 +598,10 @@ class ReadAlongReader {
         }
     }
 
+    /**
+     * Seek to a specific sentence
+     */
     seekToSentence(sentenceId) {
-        if (!this.timingData) return;
-
         const chapter = this.timingData.chapters[this.currentChapter];
         const entry = chapter.entries.find(e => e.id === sentenceId);
 
@@ -505,16 +613,19 @@ class ReadAlongReader {
         }
     }
 
+    /**
+     * Handle progress bar click
+     */
     seekTo(event) {
         const rect = this.progressBar.getBoundingClientRect();
         const percent = (event.clientX - rect.left) / rect.width;
-        const duration = this.audio.duration || 0;
-        this.audio.currentTime = Math.max(0, Math.min(duration, percent * duration));
+        this.audio.currentTime = percent * this.audio.duration;
     }
 
-    startDragging(e) {
-        e.preventDefault();
-
+    /**
+     * Start dragging progress handle
+     */
+    startDragging() {
         const onMouseMove = (e) => {
             const rect = this.progressBar.getBoundingClientRect();
             const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
@@ -532,6 +643,9 @@ class ReadAlongReader {
         document.addEventListener('mouseup', onMouseUp);
     }
 
+    /**
+     * Toggle play/pause
+     */
     togglePlay() {
         if (this.audio.paused) {
             this.audio.play();
@@ -540,220 +654,50 @@ class ReadAlongReader {
         }
     }
 
+    /**
+     * Update play button state
+     */
     updatePlayState(playing) {
         this.isPlaying = playing;
         this.playIcon.style.display = playing ? 'none' : 'block';
         this.pauseIcon.style.display = playing ? 'block' : 'none';
     }
 
+    /**
+     * Handle chapter end
+     */
     onChapterEnd() {
-        if (this.timingData && this.currentChapter < this.timingData.chapters.length - 1) {
+        // Check if sleep timer is set to end of chapter
+        if (this.sleepTimerMode === 'chapter') {
+            this.cancelSleepTimer();
+            this.showToast('Sleep timer ended');
+            return;
+        }
+
+        // Auto-advance to next chapter
+        if (this.currentChapter < this.timingData.chapters.length - 1) {
             this.loadChapter(this.currentChapter + 1);
-            setTimeout(() => this.audio.play(), 100);
-        } else {
-            this.showToast('Book finished!');
+            this.audio.play();
         }
     }
 
+    /**
+     * Handle audio loaded
+     */
     onAudioLoaded() {
         this.totalTimeEl.textContent = this.formatTime(this.audio.duration);
     }
 
-    // Page Viewer
-    toggleSplitView() {
-        if (!this.pagesData || this.totalPages === 0) {
-            this.showToast('No document pages available');
-            return;
-        }
-
-        this.splitView = !this.splitView;
-
-        if (this.splitView) {
-            this.pagePanel.classList.remove('hidden');
-            this.splitContainer.classList.add('split-view');
-            this.loadPage(1);
-        } else {
-            this.pagePanel.classList.add('hidden');
-            this.splitContainer.classList.remove('split-view');
-        }
-
-        this.saveSettings();
-    }
-
-    async loadPage(pageNum) {
-        if (!this.pagesData || pageNum < 1 || pageNum > this.totalPages) return;
-
-        this.currentPage = pageNum;
-        this.pageIndicator.textContent = `Page ${pageNum} / ${this.totalPages}`;
-
-        const pageInfo = this.pagesData.pages ? this.pagesData.pages[pageNum - 1] : this.pagesData.images[pageNum - 1];
-        if (!pageInfo) return;
-
-        const fileName = pageInfo.file.split('/').pop();
-        const pageFile = this.pageFiles[fileName] || this.pageFiles[pageInfo.file];
-
-        if (pageFile) {
-            const url = URL.createObjectURL(pageFile);
-            this.pageImage.src = url;
-            this.pageImage.style.transform = `scale(${this.pageZoom})`;
-        }
-    }
-
-    prevPage() {
-        if (this.currentPage > 1) {
-            this.loadPage(this.currentPage - 1);
-        }
-    }
-
-    nextPage() {
-        if (this.currentPage < this.totalPages) {
-            this.loadPage(this.currentPage + 1);
-        }
-    }
-
-    zoomPage(delta) {
-        this.pageZoom = Math.max(0.5, Math.min(3, this.pageZoom + delta));
-        this.pageImage.style.transform = `scale(${this.pageZoom})`;
-    }
-
-    // Bookmarks
-    showBookmarkModal() {
-        document.getElementById('bookmark-modal').classList.remove('hidden');
-        document.getElementById('bookmark-note').value = '';
-        document.getElementById('bookmark-note').focus();
-    }
-
-    hideBookmarkModal() {
-        document.getElementById('bookmark-modal').classList.add('hidden');
-    }
-
-    saveBookmark() {
-        const note = document.getElementById('bookmark-note').value.trim();
-        const chapter = this.timingData.chapters[this.currentChapter];
-
-        const bookmark = {
-            id: Date.now(),
-            chapter: this.currentChapter,
-            chapterTitle: chapter.title,
-            time: this.audio.currentTime,
-            note: note,
-            created: new Date().toISOString()
-        };
-
-        this.bookmarks.push(bookmark);
-        this.saveBookmarks();
-        this.renderBookmarks();
-        this.hideBookmarkModal();
-        this.showToast('Bookmark saved!', 'success');
-    }
-
-    deleteBookmark(id) {
-        this.bookmarks = this.bookmarks.filter(b => b.id !== id);
-        this.saveBookmarks();
-        this.renderBookmarks();
-    }
-
-    goToBookmark(bookmark) {
-        this.loadChapter(bookmark.chapter);
-        setTimeout(() => {
-            this.audio.currentTime = bookmark.time;
-        }, 100);
-        document.getElementById('settings-panel').classList.remove('open');
-    }
-
-    renderBookmarks() {
-        const list = document.getElementById('bookmarks-list');
-
-        if (this.bookmarks.length === 0) {
-            list.innerHTML = '<p class="no-bookmarks">No bookmarks yet</p>';
-            return;
-        }
-
-        list.innerHTML = this.bookmarks.map(b => `
-            <div class="bookmark-item" onclick="reader.goToBookmark(${JSON.stringify(b).replace(/"/g, '&quot;')})">
-                <div class="bookmark-info">
-                    <div class="bookmark-chapter">${b.chapterTitle}</div>
-                    <div class="bookmark-time">${this.formatTime(b.time)}</div>
-                    ${b.note ? `<div class="bookmark-note">${b.note}</div>` : ''}
-                </div>
-                <button class="bookmark-delete" onclick="event.stopPropagation(); reader.deleteBookmark(${b.id})">×</button>
-            </div>
-        `).join('');
-    }
-
-    loadBookmarks() {
-        if (!this.bookData) return;
-        const key = `bookmarks_${this.bookData.bookId}`;
-        try {
-            this.bookmarks = JSON.parse(localStorage.getItem(key) || '[]');
-        } catch (e) {
-            this.bookmarks = [];
-        }
-        this.renderBookmarks();
-    }
-
-    saveBookmarks() {
-        if (!this.bookData) return;
-        const key = `bookmarks_${this.bookData.bookId}`;
-        localStorage.setItem(key, JSON.stringify(this.bookmarks));
-    }
-
-    // Sleep Timer
-    showSleepModal() {
-        document.getElementById('sleep-modal').classList.remove('hidden');
-    }
-
-    hideSleepModal() {
-        document.getElementById('sleep-modal').classList.add('hidden');
-    }
-
-    setSleepTimer(minutes) {
-        this.hideSleepModal();
-
-        if (this.sleepTimer) {
-            clearInterval(this.sleepTimer);
-            this.sleepTimer = null;
-        }
-
-        if (minutes === 0) {
-            this.sleepTimeRemaining = 0;
-            this.sleepTimerValue.textContent = '';
-            this.showToast('Sleep timer cancelled');
-            return;
-        }
-
-        this.sleepTimeRemaining = minutes * 60;
-        this.showToast(`Sleep timer set for ${minutes} minutes`, 'success');
-
-        this.sleepTimer = setInterval(() => {
-            this.sleepTimeRemaining--;
-            this.updateSleepTimerDisplay();
-
-            if (this.sleepTimeRemaining <= 0) {
-                this.audio.pause();
-                clearInterval(this.sleepTimer);
-                this.sleepTimer = null;
-                this.sleepTimerValue.textContent = '';
-                this.showToast('Sleep timer - pausing playback');
-            }
-        }, 1000);
-    }
-
-    updateSleepTimerDisplay() {
-        if (this.sleepTimeRemaining > 0) {
-            const mins = Math.floor(this.sleepTimeRemaining / 60);
-            const secs = this.sleepTimeRemaining % 60;
-            this.sleepTimerValue.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
-        }
-    }
-
-    // Settings
+    /**
+     * Set playback speed
+     */
     setSpeed(speed) {
         this.playbackSpeed = speed;
         this.audio.playbackRate = speed;
         document.getElementById('speed-value').textContent = `${speed}x`;
         document.getElementById('speed-menu').classList.remove('show');
 
+        // Update active button
         document.querySelectorAll('#speed-menu button').forEach(btn => {
             btn.classList.toggle('active', parseFloat(btn.dataset.speed) === speed);
         });
@@ -761,24 +705,19 @@ class ReadAlongReader {
         this.saveSettings();
     }
 
+    /**
+     * Set font size
+     */
     setFontSize(size) {
-        this.fontSize = Math.max(12, Math.min(28, size));
+        this.fontSize = Math.max(12, Math.min(32, size));
         document.documentElement.style.setProperty('--font-size', `${this.fontSize}px`);
         document.getElementById('font-size-value').textContent = `${this.fontSize}px`;
         this.saveSettings();
     }
 
-    setLineSpacing(spacing) {
-        this.lineHeight = spacing;
-        document.documentElement.style.setProperty('--line-height', spacing);
-
-        document.querySelectorAll('.spacing-btn').forEach(btn => {
-            btn.classList.toggle('active', parseFloat(btn.dataset.spacing) === spacing);
-        });
-
-        this.saveSettings();
-    }
-
+    /**
+     * Set theme
+     */
     setTheme(theme) {
         document.body.dataset.theme = theme;
         document.querySelectorAll('.theme-btn').forEach(btn => {
@@ -787,28 +726,12 @@ class ReadAlongReader {
         this.saveSettings();
     }
 
-    setHighlightStyle(style) {
-        this.highlightStyle = style;
-        document.body.dataset.highlight = style;
-        this.saveSettings();
-    }
-
-    resetSettings() {
-        this.setFontSize(18);
-        this.setLineSpacing(1.7);
-        this.setTheme('light');
-        this.setSpeed(1.0);
-        this.setHighlightStyle('background');
-        this.autoScroll = true;
-        document.getElementById('auto-scroll').checked = true;
-        this.saveSettings();
-        this.showToast('Settings reset to defaults');
-    }
-
+    /**
+     * Handle keyboard shortcuts
+     */
     handleKeyboard(event) {
-        if (event.target.tagName === 'INPUT' || event.target.tagName === 'SELECT' || event.target.tagName === 'TEXTAREA') {
-            return;
-        }
+        // Ignore if in input field
+        if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA' || event.target.tagName === 'SELECT') return;
 
         switch (event.code) {
             case 'Space':
@@ -816,95 +739,591 @@ class ReadAlongReader {
                 this.togglePlay();
                 break;
             case 'ArrowLeft':
-                if (event.shiftKey) {
-                    if (this.currentChapter > 0) this.loadChapter(this.currentChapter - 1);
-                } else {
-                    this.audio.currentTime = Math.max(0, this.audio.currentTime - 5);
-                }
+                this.audio.currentTime = Math.max(0, this.audio.currentTime - 5);
                 break;
             case 'ArrowRight':
-                if (event.shiftKey) {
-                    if (this.timingData && this.currentChapter < this.timingData.chapters.length - 1) {
-                        this.loadChapter(this.currentChapter + 1);
-                    }
-                } else {
-                    this.audio.currentTime = Math.min(this.audio.duration || 0, this.audio.currentTime + 5);
-                }
+                this.audio.currentTime = Math.min(this.audio.duration, this.audio.currentTime + 5);
                 break;
             case 'ArrowUp':
                 event.preventDefault();
-                this.setSpeed(Math.min(2, this.playbackSpeed + 0.25));
+                if (this.currentChapter > 0) this.loadChapter(this.currentChapter - 1);
                 break;
             case 'ArrowDown':
                 event.preventDefault();
-                this.setSpeed(Math.max(0.5, this.playbackSpeed - 0.25));
+                if (this.currentChapter < this.timingData.chapters.length - 1) {
+                    this.loadChapter(this.currentChapter + 1);
+                }
                 break;
             case 'KeyB':
-                this.showBookmarkModal();
+                this.addBookmark();
                 break;
-            case 'KeyP':
-                if (this.pagesData) this.toggleSplitView();
-                break;
-            case 'Escape':
-                document.getElementById('settings-panel').classList.remove('open');
-                document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
+            case 'KeyF':
+                if (event.ctrlKey || event.metaKey) {
+                    event.preventDefault();
+                    this.openSearchModal();
+                }
                 break;
         }
     }
 
-    formatTime(seconds) {
-        if (!seconds || isNaN(seconds)) return '0:00';
-        const hrs = Math.floor(seconds / 3600);
-        const mins = Math.floor((seconds % 3600) / 60);
-        const secs = Math.floor(seconds % 60);
+    // ==================== BOOKMARKS ====================
 
-        if (hrs > 0) {
-            return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-        }
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
-    }
+    /**
+     * Add a bookmark at current position
+     */
+    addBookmark() {
+        if (!this.bookData) return;
 
-    showLoading(show) {
-        document.getElementById('loading-state').classList.toggle('active', show);
-        document.getElementById('empty-state').classList.toggle('active', !show);
-    }
+        const chapter = this.timingData.chapters[this.currentChapter];
+        const currentTime = this.audio.currentTime;
+        const currentEntry = chapter.entries[this.currentSentenceIndex] || {};
 
-    showToast(message, type = '') {
-        const container = document.getElementById('toast-container');
-        const toast = document.createElement('div');
-        toast.className = `toast ${type}`;
-        toast.textContent = message;
-        container.appendChild(toast);
+        const bookmark = {
+            id: Date.now().toString(),
+            bookId: this.bookData.bookId,
+            chapter: this.currentChapter,
+            chapterTitle: chapter.title,
+            time: currentTime,
+            text: currentEntry.text || '',
+            createdAt: new Date().toISOString()
+        };
 
+        this.bookmarks.push(bookmark);
+        this.saveBookData();
+        this.renderBookmarks();
+        this.updateBookmarkMarkers();
+        this.showToast('Bookmark added');
+
+        // Flash the bookmark button
+        document.getElementById('bookmark-btn').classList.add('active');
         setTimeout(() => {
-            toast.remove();
-        }, 3000);
+            document.getElementById('bookmark-btn').classList.remove('active');
+        }, 500);
     }
 
-    // Persistence
+    /**
+     * Remove a bookmark
+     */
+    removeBookmark(id) {
+        this.bookmarks = this.bookmarks.filter(b => b.id !== id);
+        this.saveBookData();
+        this.renderBookmarks();
+        this.updateBookmarkMarkers();
+        this.showToast('Bookmark removed');
+    }
+
+    /**
+     * Jump to a bookmark
+     */
+    jumpToBookmark(bookmark) {
+        if (bookmark.chapter !== this.currentChapter) {
+            this.loadChapter(bookmark.chapter, bookmark.time);
+        } else {
+            this.audio.currentTime = bookmark.time;
+        }
+        if (!this.isPlaying) {
+            this.audio.play();
+        }
+        document.getElementById('bookmarks-panel').classList.remove('open');
+    }
+
+    /**
+     * Render bookmarks list
+     */
+    renderBookmarks() {
+        const container = document.getElementById('bookmarks-list');
+        const bookBookmarks = this.bookmarks.filter(b => b.bookId === this.bookData?.bookId);
+
+        if (bookBookmarks.length === 0) {
+            container.innerHTML = '<p class="empty-message">No bookmarks yet. Click the bookmark button while listening to add one.</p>';
+            return;
+        }
+
+        container.innerHTML = bookBookmarks.map(b => `
+            <div class="bookmark-item" data-id="${b.id}">
+                <button class="bookmark-delete" onclick="event.stopPropagation(); reader.removeBookmark('${b.id}')">Delete</button>
+                <div class="bookmark-time">${this.formatTime(b.time)}</div>
+                <div class="bookmark-chapter">${b.chapterTitle}</div>
+                <div class="bookmark-text">"${b.text.substring(0, 60)}${b.text.length > 60 ? '...' : ''}"</div>
+            </div>
+        `).join('');
+
+        // Add click handlers
+        container.querySelectorAll('.bookmark-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const bookmark = this.bookmarks.find(b => b.id === item.dataset.id);
+                if (bookmark) this.jumpToBookmark(bookmark);
+            });
+        });
+    }
+
+    /**
+     * Update bookmark markers on progress bar
+     */
+    updateBookmarkMarkers() {
+        const container = document.getElementById('bookmark-markers');
+        const chapterBookmarks = this.bookmarks.filter(
+            b => b.bookId === this.bookData?.bookId && b.chapter === this.currentChapter
+        );
+        const duration = this.audio.duration || 1;
+
+        container.innerHTML = chapterBookmarks.map(b => {
+            const percent = (b.time / duration) * 100;
+            return `<div class="bookmark-marker" style="left: ${percent}%"></div>`;
+        }).join('');
+    }
+
+    // ==================== NOTES ====================
+
+    /**
+     * Handle text selection for notes
+     */
+    handleTextSelection() {
+        const selection = window.getSelection();
+        const text = selection.toString().trim();
+
+        if (text.length > 0) {
+            // Find the sentence element
+            let node = selection.anchorNode;
+            while (node && !node.classList?.contains('sentence')) {
+                node = node.parentNode;
+            }
+
+            if (node && node.classList?.contains('sentence')) {
+                this.selectedText = text;
+                this.selectedSentenceId = node.dataset.id;
+                this.openNotesModal(text);
+            }
+        }
+    }
+
+    /**
+     * Open notes modal
+     */
+    openNotesModal(text) {
+        document.getElementById('selected-text-preview').textContent = `"${text}"`;
+        document.getElementById('note-input').value = '';
+        document.getElementById('notes-modal').classList.add('open');
+    }
+
+    /**
+     * Close notes modal
+     */
+    closeNotesModal() {
+        document.getElementById('notes-modal').classList.remove('open');
+        window.getSelection().removeAllRanges();
+    }
+
+    /**
+     * Save a note
+     */
+    saveNote() {
+        const noteText = document.getElementById('note-input').value.trim();
+        if (!noteText && !this.selectedText) return;
+
+        const note = {
+            id: Date.now().toString(),
+            bookId: this.bookData.bookId,
+            chapter: this.currentChapter,
+            sentenceId: this.selectedSentenceId,
+            selectedText: this.selectedText,
+            note: noteText,
+            createdAt: new Date().toISOString()
+        };
+
+        this.notes.push(note);
+        this.saveBookData();
+        this.renderNotes();
+        this.closeNotesModal();
+
+        // Update sentence styling
+        const el = document.querySelector(`[data-id="${this.selectedSentenceId}"]`);
+        if (el) el.classList.add('has-note');
+
+        this.showToast('Note saved');
+    }
+
+    /**
+     * Add highlight only (no note text)
+     */
+    addHighlight() {
+        if (!this.selectedSentenceId) return;
+
+        const highlight = {
+            id: Date.now().toString(),
+            bookId: this.bookData.bookId,
+            chapter: this.currentChapter,
+            sentenceId: this.selectedSentenceId,
+            text: this.selectedText,
+            createdAt: new Date().toISOString()
+        };
+
+        this.highlights.push(highlight);
+        this.saveBookData();
+        this.closeNotesModal();
+
+        // Update sentence styling
+        const el = document.querySelector(`[data-id="${this.selectedSentenceId}"]`);
+        if (el) el.classList.add('highlighted');
+
+        this.showToast('Highlight added');
+    }
+
+    /**
+     * Remove a note
+     */
+    removeNote(id) {
+        const note = this.notes.find(n => n.id === id);
+        if (note) {
+            const el = document.querySelector(`[data-id="${note.sentenceId}"]`);
+            if (el) el.classList.remove('has-note');
+        }
+        this.notes = this.notes.filter(n => n.id !== id);
+        this.saveBookData();
+        this.renderNotes();
+        this.showToast('Note removed');
+    }
+
+    /**
+     * Render notes list
+     */
+    renderNotes() {
+        const container = document.getElementById('notes-list');
+        const bookNotes = this.notes.filter(n => n.bookId === this.bookData?.bookId);
+
+        if (bookNotes.length === 0) {
+            container.innerHTML = '<p class="empty-message">No notes yet. Select text to add a note.</p>';
+            return;
+        }
+
+        container.innerHTML = bookNotes.map(n => `
+            <div class="note-item" data-id="${n.id}">
+                <button class="note-delete" onclick="event.stopPropagation(); reader.removeNote('${n.id}')">Delete</button>
+                <div class="note-text">"${n.selectedText.substring(0, 50)}${n.selectedText.length > 50 ? '...' : ''}"</div>
+                <div class="note-content">${n.note}</div>
+            </div>
+        `).join('');
+
+        // Add click handlers to jump to note location
+        container.querySelectorAll('.note-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const note = this.notes.find(n => n.id === item.dataset.id);
+                if (note) {
+                    if (note.chapter !== this.currentChapter) {
+                        this.loadChapter(note.chapter);
+                    }
+                    setTimeout(() => {
+                        const el = document.querySelector(`[data-id="${note.sentenceId}"]`);
+                        if (el) {
+                            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            el.classList.add('active');
+                            setTimeout(() => el.classList.remove('active'), 2000);
+                        }
+                    }, 500);
+                    document.getElementById('bookmarks-panel').classList.remove('open');
+                }
+            });
+        });
+    }
+
+    // ==================== SEARCH ====================
+
+    /**
+     * Open search modal
+     */
+    openSearchModal() {
+        document.getElementById('search-modal').classList.add('open');
+        document.getElementById('search-input').focus();
+    }
+
+    /**
+     * Close search modal
+     */
+    closeSearchModal() {
+        document.getElementById('search-modal').classList.remove('open');
+        document.getElementById('search-input').value = '';
+        document.getElementById('search-results').innerHTML = '<p class="empty-message">Enter a search term above.</p>';
+        // Remove search highlights
+        document.querySelectorAll('.sentence.search-match').forEach(el => {
+            el.classList.remove('search-match');
+        });
+    }
+
+    /**
+     * Perform search across all chapters
+     */
+    performSearch() {
+        const query = document.getElementById('search-input').value.trim().toLowerCase();
+        if (!query) return;
+
+        const results = [];
+
+        this.textData.chapters.forEach((chapter, chapterIndex) => {
+            chapter.paragraphs.forEach(paragraph => {
+                paragraph.sentences.forEach(sentence => {
+                    if (sentence.text.toLowerCase().includes(query)) {
+                        results.push({
+                            chapter: chapterIndex,
+                            chapterTitle: this.timingData.chapters[chapterIndex].title,
+                            sentenceId: sentence.id,
+                            text: sentence.text,
+                            query: query
+                        });
+                    }
+                });
+            });
+        });
+
+        this.renderSearchResults(results, query);
+    }
+
+    /**
+     * Render search results
+     */
+    renderSearchResults(results, query) {
+        const container = document.getElementById('search-results');
+
+        if (results.length === 0) {
+            container.innerHTML = '<p class="empty-message">No results found.</p>';
+            return;
+        }
+
+        const countHtml = `<div class="search-count">${results.length} result${results.length > 1 ? 's' : ''} found</div>`;
+
+        const resultsHtml = results.slice(0, 50).map(r => {
+            const highlightedText = r.text.replace(
+                new RegExp(`(${this.escapeRegex(query)})`, 'gi'),
+                '<mark>$1</mark>'
+            );
+            return `
+                <div class="search-result-item" data-chapter="${r.chapter}" data-sentence="${r.sentenceId}">
+                    <div class="search-result-chapter">${r.chapterTitle}</div>
+                    <div class="search-result-text">${highlightedText}</div>
+                </div>
+            `;
+        }).join('');
+
+        container.innerHTML = countHtml + resultsHtml;
+
+        // Add click handlers
+        container.querySelectorAll('.search-result-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const chapter = parseInt(item.dataset.chapter);
+                const sentenceId = item.dataset.sentence;
+                this.jumpToSearchResult(chapter, sentenceId, query);
+            });
+        });
+    }
+
+    /**
+     * Jump to search result
+     */
+    jumpToSearchResult(chapter, sentenceId, query) {
+        // Remove old highlights
+        document.querySelectorAll('.sentence.search-match').forEach(el => {
+            el.classList.remove('search-match');
+        });
+
+        if (chapter !== this.currentChapter) {
+            this.loadChapter(chapter);
+            setTimeout(() => this.highlightSearchResult(sentenceId), 500);
+        } else {
+            this.highlightSearchResult(sentenceId);
+        }
+
+        this.closeSearchModal();
+    }
+
+    /**
+     * Highlight and scroll to search result
+     */
+    highlightSearchResult(sentenceId) {
+        const el = document.querySelector(`[data-id="${sentenceId}"]`);
+        if (el) {
+            el.classList.add('search-match');
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+            // Also seek audio to this sentence
+            this.seekToSentence(sentenceId);
+        }
+    }
+
+    /**
+     * Escape regex special characters
+     */
+    escapeRegex(string) {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    // ==================== SLEEP TIMER ====================
+
+    /**
+     * Open sleep timer modal
+     */
+    openSleepTimerModal() {
+        document.getElementById('sleep-timer-modal').classList.add('open');
+    }
+
+    /**
+     * Close sleep timer modal
+     */
+    closeSleepTimerModal() {
+        document.getElementById('sleep-timer-modal').classList.remove('open');
+    }
+
+    /**
+     * Set sleep timer
+     */
+    setSleepTimer(value) {
+        this.cancelSleepTimer();
+
+        if (value === '0') {
+            this.showToast('Sleep timer cancelled');
+            this.closeSleepTimerModal();
+            return;
+        }
+
+        if (value === 'chapter') {
+            this.sleepTimerMode = 'chapter';
+            this.showToast('Will stop at end of chapter');
+            document.getElementById('sleep-timer-display').textContent = 'End of chapter';
+            document.getElementById('sleep-timer-btn').classList.add('active');
+        } else {
+            const minutes = parseInt(value);
+            this.sleepTimerMode = 'minutes';
+            this.sleepTimerEnd = Date.now() + minutes * 60 * 1000;
+            this.showToast(`Sleep timer set for ${minutes} minutes`);
+            document.getElementById('sleep-timer-btn').classList.add('active');
+        }
+
+        this.closeSleepTimerModal();
+    }
+
+    /**
+     * Check and update sleep timer
+     */
+    checkSleepTimer() {
+        if (!this.sleepTimerEnd && this.sleepTimerMode !== 'chapter') return;
+
+        if (this.sleepTimerMode === 'minutes') {
+            const remaining = Math.max(0, this.sleepTimerEnd - Date.now());
+            const minutes = Math.floor(remaining / 60000);
+            const seconds = Math.floor((remaining % 60000) / 1000);
+
+            document.getElementById('sleep-timer-display').textContent =
+                `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+            if (remaining <= 0) {
+                this.audio.pause();
+                this.cancelSleepTimer();
+                this.showToast('Sleep timer ended');
+            }
+        }
+    }
+
+    /**
+     * Cancel sleep timer
+     */
+    cancelSleepTimer() {
+        this.sleepTimerEnd = null;
+        this.sleepTimerMode = null;
+        document.getElementById('sleep-timer-display').textContent = '';
+        document.getElementById('sleep-timer-btn').classList.remove('active');
+    }
+
+    // ==================== PROGRESS PERSISTENCE ====================
+
+    /**
+     * Save current progress
+     */
+    saveProgress() {
+        if (!this.bookData) return;
+
+        const progress = {
+            bookId: this.bookData.bookId,
+            chapter: this.currentChapter,
+            position: this.audio.currentTime,
+            updatedAt: Date.now()
+        };
+
+        localStorage.setItem(`readalong-progress-${this.bookData.bookId}`, JSON.stringify(progress));
+    }
+
+    /**
+     * Get saved progress for current book
+     */
+    getSavedProgress() {
+        if (!this.bookData) return null;
+
+        try {
+            const saved = localStorage.getItem(`readalong-progress-${this.bookData.bookId}`);
+            if (saved) {
+                const progress = JSON.parse(saved);
+                // Only use if less than 30 days old
+                if (Date.now() - progress.updatedAt < 30 * 24 * 60 * 60 * 1000) {
+                    return progress;
+                }
+            }
+        } catch (e) {
+            console.warn('Could not load progress:', e);
+        }
+        return null;
+    }
+
+    // ==================== DATA PERSISTENCE ====================
+
+    /**
+     * Load book-specific data (bookmarks, notes)
+     */
+    loadBookData() {
+        try {
+            const saved = localStorage.getItem('readalong-bookdata');
+            if (saved) {
+                const data = JSON.parse(saved);
+                this.bookmarks = data.bookmarks || [];
+                this.notes = data.notes || [];
+                this.highlights = data.highlights || [];
+            }
+        } catch (e) {
+            console.warn('Could not load book data:', e);
+        }
+    }
+
+    /**
+     * Save book-specific data
+     */
+    saveBookData() {
+        const data = {
+            bookmarks: this.bookmarks,
+            notes: this.notes,
+            highlights: this.highlights
+        };
+        localStorage.setItem('readalong-bookdata', JSON.stringify(data));
+    }
+
+    // ==================== SETTINGS ====================
+
+    /**
+     * Save settings to localStorage
+     */
     saveSettings() {
         localStorage.setItem('readalong-settings', JSON.stringify({
             fontSize: this.fontSize,
-            lineHeight: this.lineHeight,
             theme: document.body.dataset.theme || 'light',
-            highlightStyle: this.highlightStyle,
             speed: this.playbackSpeed,
             autoScroll: this.autoScroll,
-            splitView: this.splitView,
         }));
     }
 
+    /**
+     * Load settings from localStorage
+     */
     loadSettings() {
         try {
             const settings = JSON.parse(localStorage.getItem('readalong-settings') || '{}');
 
             if (settings.fontSize) this.setFontSize(settings.fontSize);
-            if (settings.lineHeight) this.setLineSpacing(settings.lineHeight);
             if (settings.theme) this.setTheme(settings.theme);
-            if (settings.highlightStyle) {
-                this.setHighlightStyle(settings.highlightStyle);
-                document.getElementById('highlight-style').value = settings.highlightStyle;
-            }
             if (settings.speed) this.setSpeed(settings.speed);
             if (settings.autoScroll !== undefined) {
                 this.autoScroll = settings.autoScroll;
@@ -915,23 +1334,43 @@ class ReadAlongReader {
         }
     }
 
-    savePosition() {
-        if (!this.bookData) return;
-        const key = `position_${this.bookData.bookId}`;
-        localStorage.setItem(key, JSON.stringify({
-            chapter: this.currentChapter,
-            time: this.audio.currentTime
-        }));
+    // ==================== UTILITIES ====================
+
+    /**
+     * Format time in M:SS or H:MM:SS
+     */
+    formatTime(seconds) {
+        if (!seconds || isNaN(seconds)) return '0:00';
+
+        const hours = Math.floor(seconds / 3600);
+        const mins = Math.floor((seconds % 3600) / 60);
+        const secs = Math.floor(seconds % 60);
+
+        if (hours > 0) {
+            return `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
     }
 
-    getLastPosition() {
-        if (!this.bookData) return null;
-        const key = `position_${this.bookData.bookId}`;
-        try {
-            return JSON.parse(localStorage.getItem(key));
-        } catch (e) {
-            return null;
-        }
+    /**
+     * Show/hide loading state
+     */
+    showLoading(show) {
+        document.getElementById('loading-state').classList.toggle('active', show);
+        document.getElementById('empty-state').classList.toggle('active', !show);
+    }
+
+    /**
+     * Show toast notification
+     */
+    showToast(message) {
+        const toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.classList.add('show');
+
+        setTimeout(() => {
+            toast.classList.remove('show');
+        }, 3000);
     }
 }
 

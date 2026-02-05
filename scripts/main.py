@@ -424,12 +424,19 @@ def list_voices():
     default=None,
     help="Author name (default: extracted from file)",
 )
+@click.option(
+    "--skip-chapters",
+    multiple=True,
+    type=int,
+    help="Chapter numbers to skip (use multiple times: --skip-chapters 1 --skip-chapters 2)",
+)
 def readalong(
     input_file: str,
     output: Optional[str],
     voice: Optional[str],
     title: Optional[str],
     author: Optional[str],
+    skip_chapters: tuple,
 ):
     """
     Create a Read-Along book with synchronized audio and text.
@@ -451,6 +458,7 @@ def readalong(
         output_dir=Path(output) if output else None,
         title=title,
         author=author,
+        skip_chapters=list(skip_chapters) if skip_chapters else None,
     )
 
     logger.console.print("\n[bold]To use Read-Along:[/bold]")

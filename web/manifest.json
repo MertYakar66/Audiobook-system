@@ -1,0 +1,23 @@
+{
+    "name": "Read-Along Reader",
+    "short_name": "Read-Along",
+    "description": "Listen and read simultaneously with synchronized highlighting",
+    "start_url": "/index.html",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#007bff",
+    "orientation": "any",
+    "icons": [
+        {
+            "src": "icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ],
+    "categories": [
+        "books",
+        "education"
+    ],
+    "lang": "en"
+}
