@@ -16,12 +16,20 @@ class ReadAlongReader {
         this.bookData = null;
         this.timingData = null;
         this.textData = null;
+        this.pagesData = null;
         this.currentChapter = 0;
         this.currentSentenceIndex = -1;
         this.isPlaying = false;
         this.playbackSpeed = 1.0;
         this.autoScroll = true;
         this.fontSize = 18;
+
+        // Page viewer state
+        this.currentPage = 1;
+        this.totalPages = 0;
+        this.pageZoom = 1.0;
+        this.splitView = false;
+        this.pageFiles = {};
 
         // Bookmarks and Notes
         this.bookmarks = [];
@@ -51,6 +59,18 @@ class ReadAlongReader {
         this.chapterSelect = document.getElementById('chapter-select');
         this.bookTitle = document.getElementById('book-title');
         this.bookAuthor = document.getElementById('book-author');
+
+        // Page viewer DOM elements
+        this.splitContainer = document.getElementById('split-container');
+        this.pagePanel = document.getElementById('page-panel');
+        this.pageViewBtn = document.getElementById('page-view-btn');
+        this.pageImage = document.getElementById('page-image');
+        this.pageIndicator = document.getElementById('page-indicator');
+        this.pageZoomValue = document.getElementById('page-zoom-value');
+        this.pagePrevBtn = document.getElementById('page-prev');
+        this.pageNextBtn = document.getElementById('page-next');
+        this.pageZoomInBtn = document.getElementById('page-zoom-in');
+        this.pageZoomOutBtn = document.getElementById('page-zoom-out');
 
         // Book catalog for URL-based loading
         this.booksCatalog = {
@@ -103,6 +123,9 @@ class ReadAlongReader {
 
             // Store base path for audio files
             this.audioBasePath = basePath;
+
+            // Load page data (for viewing original document pages)
+            await this.loadPagesFromPath(basePath);
 
             // Load bookmarks and notes for this book
             this.loadBookData();
@@ -283,6 +306,24 @@ class ReadAlongReader {
                 }
             });
         });
+
+        // Page viewer controls
+        if (this.pageViewBtn) {
+            this.pageViewBtn.style.display = 'none'; // Hide until pages are loaded
+            this.pageViewBtn.addEventListener('click', () => this.togglePageView());
+        }
+        if (this.pagePrevBtn) {
+            this.pagePrevBtn.addEventListener('click', () => this.prevPage());
+        }
+        if (this.pageNextBtn) {
+            this.pageNextBtn.addEventListener('click', () => this.nextPage());
+        }
+        if (this.pageZoomInBtn) {
+            this.pageZoomInBtn.addEventListener('click', () => this.zoomPage(0.1));
+        }
+        if (this.pageZoomOutBtn) {
+            this.pageZoomOutBtn.addEventListener('click', () => this.zoomPage(-0.1));
+        }
     }
 
     /**
@@ -762,6 +803,9 @@ class ReadAlongReader {
                     event.preventDefault();
                     this.openSearchModal();
                 }
+                break;
+            case 'KeyP':
+                this.togglePageView();
                 break;
         }
     }
@@ -1301,6 +1345,130 @@ class ReadAlongReader {
         localStorage.setItem('readalong-bookdata', JSON.stringify(data));
     }
 
+    // ==================== PAGE VIEWER ====================
+
+    /**
+     * Load pages data from server
+     */
+    async loadPagesFromPath(basePath) {
+        try {
+            const response = await fetch(`${basePath}/pages.json`);
+            if (response.ok) {
+                this.pagesData = await response.json();
+                this.totalPages = this.pagesData.totalPages || 0;
+                this.basePath = basePath;
+
+                // Build page files map
+                if (this.pagesData.pages) {
+                    this.pagesData.pages.forEach(page => {
+                        this.pageFiles[page.number] = `${basePath}/${page.file}`;
+                    });
+                }
+
+                // Show page view button if pages are available
+                if (this.pageViewBtn && this.totalPages > 0) {
+                    this.pageViewBtn.style.display = '';
+                    this.showToast(`${this.totalPages} original pages available`);
+                }
+            }
+        } catch (e) {
+            console.log('No pages data available');
+        }
+    }
+
+    /**
+     * Toggle split view for page viewer
+     */
+    togglePageView() {
+        if (!this.pagesData || this.totalPages === 0) {
+            this.showToast('No original pages available for this book');
+            return;
+        }
+
+        this.splitView = !this.splitView;
+
+        if (this.splitView) {
+            this.pagePanel.classList.remove('hidden');
+            this.splitContainer.classList.add('split-view');
+            this.loadPage(this.currentPage);
+            this.showToast('Page view enabled');
+        } else {
+            this.pagePanel.classList.add('hidden');
+            this.splitContainer.classList.remove('split-view');
+            this.showToast('Page view disabled');
+        }
+
+        this.saveSettings();
+    }
+
+    /**
+     * Load a specific page
+     */
+    loadPage(pageNum) {
+        if (pageNum < 1 || pageNum > this.totalPages) return;
+
+        this.currentPage = pageNum;
+        const pageFile = this.pageFiles[pageNum];
+
+        if (pageFile) {
+            this.pageImage.src = pageFile;
+            this.pageImage.style.transform = `scale(${this.pageZoom})`;
+        }
+
+        this.updatePageIndicator();
+        this.updatePageNavButtons();
+    }
+
+    /**
+     * Go to previous page
+     */
+    prevPage() {
+        if (this.currentPage > 1) {
+            this.loadPage(this.currentPage - 1);
+        }
+    }
+
+    /**
+     * Go to next page
+     */
+    nextPage() {
+        if (this.currentPage < this.totalPages) {
+            this.loadPage(this.currentPage + 1);
+        }
+    }
+
+    /**
+     * Zoom page by delta
+     */
+    zoomPage(delta) {
+        this.pageZoom = Math.max(0.5, Math.min(3.0, this.pageZoom + delta));
+        this.pageImage.style.transform = `scale(${this.pageZoom})`;
+        if (this.pageZoomValue) {
+            this.pageZoomValue.textContent = `${Math.round(this.pageZoom * 100)}%`;
+        }
+    }
+
+    /**
+     * Update page indicator
+     */
+    updatePageIndicator() {
+        if (this.pageIndicator) {
+            this.pageIndicator.textContent = `Page ${this.currentPage} / ${this.totalPages}`;
+        }
+    }
+
+    /**
+     * Update page navigation buttons
+     */
+    updatePageNavButtons() {
+        if (this.pagePrevBtn) {
+            this.pagePrevBtn.disabled = this.currentPage <= 1;
+        }
+        if (this.pageNextBtn) {
+            this.pageNextBtn.disabled = this.currentPage >= this.totalPages;
+        }
+    }
+
     // ==================== SETTINGS ====================
 
     /**
@@ -1312,6 +1480,8 @@ class ReadAlongReader {
             theme: document.body.dataset.theme || 'light',
             speed: this.playbackSpeed,
             autoScroll: this.autoScroll,
+            splitView: this.splitView,
+            pageZoom: this.pageZoom,
         }));
     }
 
@@ -1328,6 +1498,9 @@ class ReadAlongReader {
             if (settings.autoScroll !== undefined) {
                 this.autoScroll = settings.autoScroll;
                 document.getElementById('auto-scroll').checked = this.autoScroll;
+            }
+            if (settings.pageZoom) {
+                this.pageZoom = settings.pageZoom;
             }
         } catch (e) {
             console.warn('Could not load settings:', e);

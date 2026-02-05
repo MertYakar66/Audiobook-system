@@ -39,6 +39,12 @@
                         <line x1="21" y1="21" x2="16.65" y2="16.65" />
                     </svg>
                 </button>
+                <button id="page-view-btn" class="icon-btn" title="View Original Pages">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="18" rx="1"/>
+                        <rect x="14" y="3" width="7" height="18" rx="1"/>
+                    </svg>
+                </button>
                 <button id="settings-btn" class="icon-btn" title="Settings">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="3" />
@@ -74,10 +80,30 @@
                     <button id="next-chapter" class="chapter-btn" disabled>Next →</button>
                 </nav>
 
-                <!-- Text Content -->
-                <article id="text-content" class="text-content">
-                    <!-- Paragraphs and sentences rendered here -->
-                </article>
+                <!-- Split View Container -->
+                <div id="split-container" class="split-container">
+                    <!-- Text Content Panel -->
+                    <div id="text-panel" class="panel text-panel">
+                        <article id="text-content" class="text-content">
+                            <!-- Paragraphs and sentences rendered here -->
+                        </article>
+                    </div>
+
+                    <!-- Page Viewer Panel (for original document) -->
+                    <div id="page-panel" class="panel page-panel hidden">
+                        <div class="page-controls">
+                            <button id="page-prev" class="page-nav-btn" title="Previous Page">‹</button>
+                            <span id="page-indicator">Page 1 / 1</span>
+                            <button id="page-next" class="page-nav-btn" title="Next Page">›</button>
+                            <button id="page-zoom-out" class="page-zoom-btn" title="Zoom Out">−</button>
+                            <span id="page-zoom-value">100%</span>
+                            <button id="page-zoom-in" class="page-zoom-btn" title="Zoom In">+</button>
+                        </div>
+                        <div id="page-viewer" class="page-viewer">
+                            <img id="page-image" src="" alt="Document page">
+                        </div>
+                    </div>
+                </div>
             </div>
         </main>
 
