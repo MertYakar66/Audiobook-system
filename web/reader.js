@@ -1,8 +1,8 @@
 /**
- * Read-Along Reader
+ * Read-Along Reader - Enhanced Edition
  *
- * Synchronized audio-text playback with sentence highlighting.
- * Supports tap-to-seek, auto-scroll, and multiple themes.
+ * Synchronized audio-text playback with sentence highlighting,
+ * page viewer for original documents, bookmarks, and more.
  */
 
 class ReadAlongReader {
@@ -11,14 +11,34 @@ class ReadAlongReader {
         this.bookData = null;
         this.timingData = null;
         this.textData = null;
+        this.pagesData = null;
         this.currentChapter = 0;
         this.currentSentenceIndex = -1;
+        this.currentPage = 1;
+        this.totalPages = 0;
+        this.pageZoom = 1.0;
         this.isPlaying = false;
         this.playbackSpeed = 1.0;
         this.autoScroll = true;
         this.fontSize = 18;
+        this.lineHeight = 1.7;
+        this.highlightStyle = 'background';
+        this.sleepTimer = null;
+        this.sleepTimeRemaining = 0;
+        this.bookmarks = [];
+        this.splitView = false;
+        this.audioFiles = {};
+        this.pageFiles = {};
 
         // DOM Elements
+        this.initElements();
+
+        // Initialize
+        this.bindEvents();
+        this.loadSettings();
+    }
+
+    initElements() {
         this.audio = document.getElementById('audio');
         this.textContent = document.getElementById('text-content');
         this.playPauseBtn = document.getElementById('play-pause');
@@ -32,15 +52,14 @@ class ReadAlongReader {
         this.chapterSelect = document.getElementById('chapter-select');
         this.bookTitle = document.getElementById('book-title');
         this.bookAuthor = document.getElementById('book-author');
-
-        // Initialize
-        this.bindEvents();
-        this.loadSettings();
+        this.chapterTitleDisplay = document.getElementById('chapter-title-display');
+        this.pagePanel = document.getElementById('page-panel');
+        this.pageImage = document.getElementById('page-image');
+        this.pageIndicator = document.getElementById('page-indicator');
+        this.splitContainer = document.getElementById('split-container');
+        this.sleepTimerValue = document.getElementById('sleep-timer-value');
     }
 
-    /**
-     * Bind all event listeners
-     */
     bindEvents() {
         // Audio events
         this.audio.addEventListener('timeupdate', () => this.onTimeUpdate());
@@ -57,12 +76,12 @@ class ReadAlongReader {
             this.audio.currentTime = Math.max(0, this.audio.currentTime - 10);
         });
         document.getElementById('skip-forward').addEventListener('click', () => {
-            this.audio.currentTime = Math.min(this.audio.duration, this.audio.currentTime + 30);
+            this.audio.currentTime = Math.min(this.audio.duration || 0, this.audio.currentTime + 30);
         });
 
         // Progress bar
         this.progressBar.addEventListener('click', (e) => this.seekTo(e));
-        this.progressBar.addEventListener('mousedown', () => this.startDragging());
+        this.progressBar.addEventListener('mousedown', (e) => this.startDragging(e));
 
         // Speed control
         document.getElementById('speed-btn').addEventListener('click', () => {
@@ -80,12 +99,12 @@ class ReadAlongReader {
             if (this.currentChapter > 0) this.loadChapter(this.currentChapter - 1);
         });
         document.getElementById('next-chapter').addEventListener('click', () => {
-            if (this.currentChapter < this.timingData.chapters.length - 1) {
+            if (this.timingData && this.currentChapter < this.timingData.chapters.length - 1) {
                 this.loadChapter(this.currentChapter + 1);
             }
         });
 
-        // Settings
+        // Settings panel
         document.getElementById('settings-btn').addEventListener('click', () => {
             document.getElementById('settings-panel').classList.add('open');
         });
@@ -101,15 +120,48 @@ class ReadAlongReader {
             this.setFontSize(this.fontSize + 2);
         });
 
+        // Line spacing
+        document.querySelectorAll('.spacing-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => this.setLineSpacing(parseFloat(e.target.dataset.spacing)));
+        });
+
         // Theme
         document.querySelectorAll('.theme-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => this.setTheme(e.target.dataset.theme));
+            btn.addEventListener('click', (e) => this.setTheme(e.currentTarget.dataset.theme));
+        });
+
+        // Highlight style
+        document.getElementById('highlight-style').addEventListener('change', (e) => {
+            this.setHighlightStyle(e.target.value);
         });
 
         // Auto-scroll toggle
         document.getElementById('auto-scroll').addEventListener('change', (e) => {
             this.autoScroll = e.target.checked;
             this.saveSettings();
+        });
+
+        // Reset settings
+        document.getElementById('reset-settings').addEventListener('click', () => this.resetSettings());
+
+        // View mode toggle (split view)
+        document.getElementById('view-mode-btn').addEventListener('click', () => this.toggleSplitView());
+
+        // Page navigation
+        document.getElementById('page-prev').addEventListener('click', () => this.prevPage());
+        document.getElementById('page-next').addEventListener('click', () => this.nextPage());
+        document.getElementById('page-zoom-in').addEventListener('click', () => this.zoomPage(0.2));
+        document.getElementById('page-zoom-out').addEventListener('click', () => this.zoomPage(-0.2));
+
+        // Bookmarks
+        document.getElementById('bookmark-btn').addEventListener('click', () => this.showBookmarkModal());
+        document.getElementById('save-bookmark').addEventListener('click', () => this.saveBookmark());
+        document.getElementById('cancel-bookmark').addEventListener('click', () => this.hideBookmarkModal());
+
+        // Sleep timer
+        document.getElementById('sleep-timer').addEventListener('click', () => this.showSleepModal());
+        document.querySelectorAll('.sleep-options button').forEach(btn => {
+            btn.addEventListener('click', (e) => this.setSleepTimer(parseInt(e.target.dataset.minutes)));
         });
 
         // Book selection
@@ -128,22 +180,41 @@ class ReadAlongReader {
             if (!e.target.closest('.speed-control')) {
                 document.getElementById('speed-menu').classList.remove('show');
             }
+            if (!e.target.closest('.settings-panel') && !e.target.closest('#settings-btn')) {
+                document.getElementById('settings-panel').classList.remove('open');
+            }
+        });
+
+        // Modal close on backdrop click
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.add('hidden');
+                }
+            });
         });
     }
 
-    /**
-     * Handle folder selection
-     */
     async handleFolderSelect(files) {
         const fileMap = {};
         for (const file of files) {
-            fileMap[file.name] = file;
+            const relativePath = file.webkitRelativePath || file.name;
+            const fileName = relativePath.split('/').pop();
+            fileMap[fileName] = file;
+
+            // Also store with path for nested files
+            if (relativePath.includes('/')) {
+                const parts = relativePath.split('/');
+                if (parts.length >= 2) {
+                    const subPath = parts.slice(1).join('/');
+                    fileMap[subPath] = file;
+                }
+            }
         }
 
-        // Look for manifest.json
         const manifestFile = fileMap['manifest.json'];
         if (!manifestFile) {
-            alert('No manifest.json found. Please select a processed book folder.');
+            this.showToast('No manifest.json found. Please select a processed book folder.', 'error');
             return;
         }
 
@@ -155,41 +226,55 @@ class ReadAlongReader {
             this.bookData = JSON.parse(manifestText);
 
             // Read timing data
-            const timingFile = fileMap[this.bookData.timing];
+            const timingFile = fileMap[this.bookData.timing] || fileMap['timing.json'];
             if (timingFile) {
                 const timingText = await this.readFile(timingFile);
                 this.timingData = JSON.parse(timingText);
             }
 
             // Read text data
-            const textFile = fileMap[this.bookData.text];
+            const textFile = fileMap[this.bookData.text] || fileMap['text.json'];
             if (textFile) {
                 const textText = await this.readFile(textFile);
                 this.textData = JSON.parse(textText);
             }
 
-            // Store audio files reference
-            this.audioFiles = {};
-            for (const [name, file] of Object.entries(fileMap)) {
-                if (name.endsWith('.wav') || name.endsWith('.mp3')) {
-                    this.audioFiles[name] = file;
+            // Read pages data if available
+            if (this.bookData.hasOriginalPages || this.bookData.pages) {
+                const pagesFile = fileMap[this.bookData.pages] || fileMap['pages.json'];
+                if (pagesFile) {
+                    const pagesText = await this.readFile(pagesFile);
+                    this.pagesData = JSON.parse(pagesText);
                 }
             }
+
+            // Store audio files reference
+            this.audioFiles = {};
+            this.pageFiles = {};
+
+            for (const [name, file] of Object.entries(fileMap)) {
+                if (name.endsWith('.wav') || name.endsWith('.mp3') || name.endsWith('.m4a')) {
+                    this.audioFiles[name] = file;
+                }
+                if (name.endsWith('.jpg') || name.endsWith('.png') || name.endsWith('.jpeg')) {
+                    this.pageFiles[name] = file;
+                }
+            }
+
+            // Load bookmarks for this book
+            this.loadBookmarks();
 
             // Initialize reader
             this.initializeReader();
 
         } catch (error) {
             console.error('Error loading book:', error);
-            alert('Error loading book: ' + error.message);
+            this.showToast('Error loading book: ' + error.message, 'error');
         } finally {
             this.showLoading(false);
         }
     }
 
-    /**
-     * Read file as text
-     */
     readFile(file) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -199,9 +284,6 @@ class ReadAlongReader {
         });
     }
 
-    /**
-     * Initialize the reader with loaded book data
-     */
     initializeReader() {
         // Update header
         this.bookTitle.textContent = this.bookData.title;
@@ -212,23 +294,42 @@ class ReadAlongReader {
         this.timingData.chapters.forEach((chapter, index) => {
             const option = document.createElement('option');
             option.value = index;
-            option.textContent = chapter.title;
+            option.textContent = `${index + 1}. ${chapter.title}`;
             this.chapterSelect.appendChild(option);
         });
+
+        // Setup page viewer if pages available
+        if (this.pagesData) {
+            this.totalPages = this.pagesData.total_pages || this.pagesData.total_images || 0;
+            if (this.totalPages > 0) {
+                document.getElementById('view-mode-btn').style.display = 'flex';
+            }
+        }
 
         // Show reader view
         document.getElementById('empty-state').classList.remove('active');
         document.getElementById('reader-view').style.display = 'block';
         document.getElementById('player').style.display = 'block';
 
-        // Load first chapter
-        this.loadChapter(0);
+        // Restore last position if available
+        const lastPosition = this.getLastPosition();
+        if (lastPosition) {
+            this.loadChapter(lastPosition.chapter);
+            setTimeout(() => {
+                this.audio.currentTime = lastPosition.time;
+            }, 500);
+        } else {
+            this.loadChapter(0);
+        }
+
+        this.showToast(`Loaded: ${this.bookData.title}`, 'success');
     }
 
-    /**
-     * Load a specific chapter
-     */
     async loadChapter(chapterIndex) {
+        if (!this.timingData || chapterIndex < 0 || chapterIndex >= this.timingData.chapters.length) {
+            return;
+        }
+
         this.currentChapter = chapterIndex;
         this.currentSentenceIndex = -1;
 
@@ -242,13 +343,18 @@ class ReadAlongReader {
         document.getElementById('prev-chapter').disabled = chapterIndex === 0;
         document.getElementById('next-chapter').disabled = chapterIndex === this.timingData.chapters.length - 1;
 
+        // Update chapter title display
+        this.chapterTitleDisplay.textContent = chapter.title;
+
         // Render text
         this.renderText(textChapter);
 
         // Load audio
         const audioFileName = chapter.audioFile.split('/').pop();
-        if (this.audioFiles[audioFileName]) {
-            const audioUrl = URL.createObjectURL(this.audioFiles[audioFileName]);
+        const audioFile = this.audioFiles[audioFileName] || this.audioFiles[`audio/${audioFileName}`];
+
+        if (audioFile) {
+            const audioUrl = URL.createObjectURL(audioFile);
             this.audio.src = audioUrl;
         }
 
@@ -261,9 +367,6 @@ class ReadAlongReader {
         this.textContent.scrollTop = 0;
     }
 
-    /**
-     * Render text content with sentence spans
-     */
     renderText(chapterData) {
         this.textContent.innerHTML = '';
 
@@ -278,7 +381,6 @@ class ReadAlongReader {
                 sentenceEl.dataset.id = sentence.id;
                 sentenceEl.textContent = sentence.text + ' ';
 
-                // Click to seek
                 sentenceEl.addEventListener('click', () => {
                     this.seekToSentence(sentence.id);
                 });
@@ -290,63 +392,68 @@ class ReadAlongReader {
         });
     }
 
-    /**
-     * Handle audio time updates
-     */
     onTimeUpdate() {
         const currentTime = this.audio.currentTime;
         const duration = this.audio.duration || 0;
 
         // Update progress bar
-        const percent = (currentTime / duration) * 100;
-        this.progressFill.style.width = `${percent}%`;
-        this.progressHandle.style.left = `${percent}%`;
+        if (duration > 0) {
+            const percent = (currentTime / duration) * 100;
+            this.progressFill.style.width = `${percent}%`;
+            this.progressHandle.style.left = `${percent}%`;
+        }
 
         // Update time display
         this.currentTimeEl.textContent = this.formatTime(currentTime);
 
+        // Save position
+        this.savePosition();
+
         // Find and highlight current sentence
         this.highlightCurrentSentence(currentTime);
+
+        // Update sleep timer display
+        if (this.sleepTimer) {
+            this.updateSleepTimerDisplay();
+        }
     }
 
-    /**
-     * Find and highlight the sentence at current time
-     */
     highlightCurrentSentence(currentTime) {
+        if (!this.timingData) return;
+
         const chapter = this.timingData.chapters[this.currentChapter];
+        if (!chapter) return;
+
         const entries = chapter.entries;
 
-        // Find current sentence
         let currentIndex = -1;
         for (let i = 0; i < entries.length; i++) {
             if (currentTime >= entries[i].start && currentTime < entries[i].end) {
                 currentIndex = i;
                 break;
             }
-            // If between sentences, highlight the upcoming one
             if (currentTime < entries[i].start) {
                 currentIndex = i > 0 ? i - 1 : -1;
                 break;
             }
         }
 
-        // Handle end of chapter
         if (currentIndex === -1 && entries.length > 0 && currentTime >= entries[entries.length - 1].start) {
             currentIndex = entries.length - 1;
         }
 
-        // Update highlighting if changed
         if (currentIndex !== this.currentSentenceIndex) {
             this.currentSentenceIndex = currentIndex;
             this.updateHighlighting();
         }
     }
 
-    /**
-     * Update sentence highlighting
-     */
     updateHighlighting() {
+        if (!this.timingData) return;
+
         const chapter = this.timingData.chapters[this.currentChapter];
+        if (!chapter) return;
+
         const entries = chapter.entries;
 
         // Remove all highlights
@@ -360,7 +467,6 @@ class ReadAlongReader {
             if (el) {
                 if (index === this.currentSentenceIndex) {
                     el.classList.add('active');
-                    // Auto-scroll
                     if (this.autoScroll && this.isPlaying) {
                         this.scrollToElement(el);
                     }
@@ -371,15 +477,11 @@ class ReadAlongReader {
         });
     }
 
-    /**
-     * Scroll to element smoothly
-     */
     scrollToElement(element) {
         const container = this.textContent;
         const elementRect = element.getBoundingClientRect();
         const containerRect = container.getBoundingClientRect();
 
-        // Check if element is out of view
         if (elementRect.top < containerRect.top + 100 || elementRect.bottom > containerRect.bottom - 100) {
             const scrollTop = element.offsetTop - container.offsetTop - (container.clientHeight / 3);
             container.scrollTo({
@@ -389,10 +491,9 @@ class ReadAlongReader {
         }
     }
 
-    /**
-     * Seek to a specific sentence
-     */
     seekToSentence(sentenceId) {
+        if (!this.timingData) return;
+
         const chapter = this.timingData.chapters[this.currentChapter];
         const entry = chapter.entries.find(e => e.id === sentenceId);
 
@@ -404,19 +505,16 @@ class ReadAlongReader {
         }
     }
 
-    /**
-     * Handle progress bar click
-     */
     seekTo(event) {
         const rect = this.progressBar.getBoundingClientRect();
         const percent = (event.clientX - rect.left) / rect.width;
-        this.audio.currentTime = percent * this.audio.duration;
+        const duration = this.audio.duration || 0;
+        this.audio.currentTime = Math.max(0, Math.min(duration, percent * duration));
     }
 
-    /**
-     * Start dragging progress handle
-     */
-    startDragging() {
+    startDragging(e) {
+        e.preventDefault();
+
         const onMouseMove = (e) => {
             const rect = this.progressBar.getBoundingClientRect();
             const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
@@ -434,9 +532,6 @@ class ReadAlongReader {
         document.addEventListener('mouseup', onMouseUp);
     }
 
-    /**
-     * Toggle play/pause
-     */
     togglePlay() {
         if (this.audio.paused) {
             this.audio.play();
@@ -445,43 +540,220 @@ class ReadAlongReader {
         }
     }
 
-    /**
-     * Update play button state
-     */
     updatePlayState(playing) {
         this.isPlaying = playing;
         this.playIcon.style.display = playing ? 'none' : 'block';
         this.pauseIcon.style.display = playing ? 'block' : 'none';
     }
 
-    /**
-     * Handle chapter end
-     */
     onChapterEnd() {
-        // Auto-advance to next chapter
-        if (this.currentChapter < this.timingData.chapters.length - 1) {
+        if (this.timingData && this.currentChapter < this.timingData.chapters.length - 1) {
             this.loadChapter(this.currentChapter + 1);
-            this.audio.play();
+            setTimeout(() => this.audio.play(), 100);
+        } else {
+            this.showToast('Book finished!');
         }
     }
 
-    /**
-     * Handle audio loaded
-     */
     onAudioLoaded() {
         this.totalTimeEl.textContent = this.formatTime(this.audio.duration);
     }
 
-    /**
-     * Set playback speed
-     */
+    // Page Viewer
+    toggleSplitView() {
+        if (!this.pagesData || this.totalPages === 0) {
+            this.showToast('No document pages available');
+            return;
+        }
+
+        this.splitView = !this.splitView;
+
+        if (this.splitView) {
+            this.pagePanel.classList.remove('hidden');
+            this.splitContainer.classList.add('split-view');
+            this.loadPage(1);
+        } else {
+            this.pagePanel.classList.add('hidden');
+            this.splitContainer.classList.remove('split-view');
+        }
+
+        this.saveSettings();
+    }
+
+    async loadPage(pageNum) {
+        if (!this.pagesData || pageNum < 1 || pageNum > this.totalPages) return;
+
+        this.currentPage = pageNum;
+        this.pageIndicator.textContent = `Page ${pageNum} / ${this.totalPages}`;
+
+        const pageInfo = this.pagesData.pages ? this.pagesData.pages[pageNum - 1] : this.pagesData.images[pageNum - 1];
+        if (!pageInfo) return;
+
+        const fileName = pageInfo.file.split('/').pop();
+        const pageFile = this.pageFiles[fileName] || this.pageFiles[pageInfo.file];
+
+        if (pageFile) {
+            const url = URL.createObjectURL(pageFile);
+            this.pageImage.src = url;
+            this.pageImage.style.transform = `scale(${this.pageZoom})`;
+        }
+    }
+
+    prevPage() {
+        if (this.currentPage > 1) {
+            this.loadPage(this.currentPage - 1);
+        }
+    }
+
+    nextPage() {
+        if (this.currentPage < this.totalPages) {
+            this.loadPage(this.currentPage + 1);
+        }
+    }
+
+    zoomPage(delta) {
+        this.pageZoom = Math.max(0.5, Math.min(3, this.pageZoom + delta));
+        this.pageImage.style.transform = `scale(${this.pageZoom})`;
+    }
+
+    // Bookmarks
+    showBookmarkModal() {
+        document.getElementById('bookmark-modal').classList.remove('hidden');
+        document.getElementById('bookmark-note').value = '';
+        document.getElementById('bookmark-note').focus();
+    }
+
+    hideBookmarkModal() {
+        document.getElementById('bookmark-modal').classList.add('hidden');
+    }
+
+    saveBookmark() {
+        const note = document.getElementById('bookmark-note').value.trim();
+        const chapter = this.timingData.chapters[this.currentChapter];
+
+        const bookmark = {
+            id: Date.now(),
+            chapter: this.currentChapter,
+            chapterTitle: chapter.title,
+            time: this.audio.currentTime,
+            note: note,
+            created: new Date().toISOString()
+        };
+
+        this.bookmarks.push(bookmark);
+        this.saveBookmarks();
+        this.renderBookmarks();
+        this.hideBookmarkModal();
+        this.showToast('Bookmark saved!', 'success');
+    }
+
+    deleteBookmark(id) {
+        this.bookmarks = this.bookmarks.filter(b => b.id !== id);
+        this.saveBookmarks();
+        this.renderBookmarks();
+    }
+
+    goToBookmark(bookmark) {
+        this.loadChapter(bookmark.chapter);
+        setTimeout(() => {
+            this.audio.currentTime = bookmark.time;
+        }, 100);
+        document.getElementById('settings-panel').classList.remove('open');
+    }
+
+    renderBookmarks() {
+        const list = document.getElementById('bookmarks-list');
+
+        if (this.bookmarks.length === 0) {
+            list.innerHTML = '<p class="no-bookmarks">No bookmarks yet</p>';
+            return;
+        }
+
+        list.innerHTML = this.bookmarks.map(b => `
+            <div class="bookmark-item" onclick="reader.goToBookmark(${JSON.stringify(b).replace(/"/g, '&quot;')})">
+                <div class="bookmark-info">
+                    <div class="bookmark-chapter">${b.chapterTitle}</div>
+                    <div class="bookmark-time">${this.formatTime(b.time)}</div>
+                    ${b.note ? `<div class="bookmark-note">${b.note}</div>` : ''}
+                </div>
+                <button class="bookmark-delete" onclick="event.stopPropagation(); reader.deleteBookmark(${b.id})">×</button>
+            </div>
+        `).join('');
+    }
+
+    loadBookmarks() {
+        if (!this.bookData) return;
+        const key = `bookmarks_${this.bookData.bookId}`;
+        try {
+            this.bookmarks = JSON.parse(localStorage.getItem(key) || '[]');
+        } catch (e) {
+            this.bookmarks = [];
+        }
+        this.renderBookmarks();
+    }
+
+    saveBookmarks() {
+        if (!this.bookData) return;
+        const key = `bookmarks_${this.bookData.bookId}`;
+        localStorage.setItem(key, JSON.stringify(this.bookmarks));
+    }
+
+    // Sleep Timer
+    showSleepModal() {
+        document.getElementById('sleep-modal').classList.remove('hidden');
+    }
+
+    hideSleepModal() {
+        document.getElementById('sleep-modal').classList.add('hidden');
+    }
+
+    setSleepTimer(minutes) {
+        this.hideSleepModal();
+
+        if (this.sleepTimer) {
+            clearInterval(this.sleepTimer);
+            this.sleepTimer = null;
+        }
+
+        if (minutes === 0) {
+            this.sleepTimeRemaining = 0;
+            this.sleepTimerValue.textContent = '';
+            this.showToast('Sleep timer cancelled');
+            return;
+        }
+
+        this.sleepTimeRemaining = minutes * 60;
+        this.showToast(`Sleep timer set for ${minutes} minutes`, 'success');
+
+        this.sleepTimer = setInterval(() => {
+            this.sleepTimeRemaining--;
+            this.updateSleepTimerDisplay();
+
+            if (this.sleepTimeRemaining <= 0) {
+                this.audio.pause();
+                clearInterval(this.sleepTimer);
+                this.sleepTimer = null;
+                this.sleepTimerValue.textContent = '';
+                this.showToast('Sleep timer - pausing playback');
+            }
+        }, 1000);
+    }
+
+    updateSleepTimerDisplay() {
+        if (this.sleepTimeRemaining > 0) {
+            const mins = Math.floor(this.sleepTimeRemaining / 60);
+            const secs = this.sleepTimeRemaining % 60;
+            this.sleepTimerValue.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+    }
+
+    // Settings
     setSpeed(speed) {
         this.playbackSpeed = speed;
         this.audio.playbackRate = speed;
         document.getElementById('speed-value').textContent = `${speed}x`;
         document.getElementById('speed-menu').classList.remove('show');
 
-        // Update active button
         document.querySelectorAll('#speed-menu button').forEach(btn => {
             btn.classList.toggle('active', parseFloat(btn.dataset.speed) === speed);
         });
@@ -489,19 +761,24 @@ class ReadAlongReader {
         this.saveSettings();
     }
 
-    /**
-     * Set font size
-     */
     setFontSize(size) {
-        this.fontSize = Math.max(12, Math.min(32, size));
+        this.fontSize = Math.max(12, Math.min(28, size));
         document.documentElement.style.setProperty('--font-size', `${this.fontSize}px`);
         document.getElementById('font-size-value').textContent = `${this.fontSize}px`;
         this.saveSettings();
     }
 
-    /**
-     * Set theme
-     */
+    setLineSpacing(spacing) {
+        this.lineHeight = spacing;
+        document.documentElement.style.setProperty('--line-height', spacing);
+
+        document.querySelectorAll('.spacing-btn').forEach(btn => {
+            btn.classList.toggle('active', parseFloat(btn.dataset.spacing) === spacing);
+        });
+
+        this.saveSettings();
+    }
+
     setTheme(theme) {
         document.body.dataset.theme = theme;
         document.querySelectorAll('.theme-btn').forEach(btn => {
@@ -510,12 +787,28 @@ class ReadAlongReader {
         this.saveSettings();
     }
 
-    /**
-     * Handle keyboard shortcuts
-     */
+    setHighlightStyle(style) {
+        this.highlightStyle = style;
+        document.body.dataset.highlight = style;
+        this.saveSettings();
+    }
+
+    resetSettings() {
+        this.setFontSize(18);
+        this.setLineSpacing(1.7);
+        this.setTheme('light');
+        this.setSpeed(1.0);
+        this.setHighlightStyle('background');
+        this.autoScroll = true;
+        document.getElementById('auto-scroll').checked = true;
+        this.saveSettings();
+        this.showToast('Settings reset to defaults');
+    }
+
     handleKeyboard(event) {
-        // Ignore if in input field
-        if (event.target.tagName === 'INPUT' || event.target.tagName === 'SELECT') return;
+        if (event.target.tagName === 'INPUT' || event.target.tagName === 'SELECT' || event.target.tagName === 'TEXTAREA') {
+            return;
+        }
 
         switch (event.code) {
             case 'Space':
@@ -523,63 +816,95 @@ class ReadAlongReader {
                 this.togglePlay();
                 break;
             case 'ArrowLeft':
-                this.audio.currentTime = Math.max(0, this.audio.currentTime - 5);
+                if (event.shiftKey) {
+                    if (this.currentChapter > 0) this.loadChapter(this.currentChapter - 1);
+                } else {
+                    this.audio.currentTime = Math.max(0, this.audio.currentTime - 5);
+                }
                 break;
             case 'ArrowRight':
-                this.audio.currentTime = Math.min(this.audio.duration, this.audio.currentTime + 5);
+                if (event.shiftKey) {
+                    if (this.timingData && this.currentChapter < this.timingData.chapters.length - 1) {
+                        this.loadChapter(this.currentChapter + 1);
+                    }
+                } else {
+                    this.audio.currentTime = Math.min(this.audio.duration || 0, this.audio.currentTime + 5);
+                }
                 break;
             case 'ArrowUp':
                 event.preventDefault();
-                if (this.currentChapter > 0) this.loadChapter(this.currentChapter - 1);
+                this.setSpeed(Math.min(2, this.playbackSpeed + 0.25));
                 break;
             case 'ArrowDown':
                 event.preventDefault();
-                if (this.currentChapter < this.timingData.chapters.length - 1) {
-                    this.loadChapter(this.currentChapter + 1);
-                }
+                this.setSpeed(Math.max(0.5, this.playbackSpeed - 0.25));
+                break;
+            case 'KeyB':
+                this.showBookmarkModal();
+                break;
+            case 'KeyP':
+                if (this.pagesData) this.toggleSplitView();
+                break;
+            case 'Escape':
+                document.getElementById('settings-panel').classList.remove('open');
+                document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
                 break;
         }
     }
 
-    /**
-     * Format time in M:SS
-     */
     formatTime(seconds) {
         if (!seconds || isNaN(seconds)) return '0:00';
-        const mins = Math.floor(seconds / 60);
+        const hrs = Math.floor(seconds / 3600);
+        const mins = Math.floor((seconds % 3600) / 60);
         const secs = Math.floor(seconds % 60);
+
+        if (hrs > 0) {
+            return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     }
 
-    /**
-     * Show/hide loading state
-     */
     showLoading(show) {
         document.getElementById('loading-state').classList.toggle('active', show);
         document.getElementById('empty-state').classList.toggle('active', !show);
     }
 
-    /**
-     * Save settings to localStorage
-     */
+    showToast(message, type = '') {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.textContent = message;
+        container.appendChild(toast);
+
+        setTimeout(() => {
+            toast.remove();
+        }, 3000);
+    }
+
+    // Persistence
     saveSettings() {
         localStorage.setItem('readalong-settings', JSON.stringify({
             fontSize: this.fontSize,
+            lineHeight: this.lineHeight,
             theme: document.body.dataset.theme || 'light',
+            highlightStyle: this.highlightStyle,
             speed: this.playbackSpeed,
             autoScroll: this.autoScroll,
+            splitView: this.splitView,
         }));
     }
 
-    /**
-     * Load settings from localStorage
-     */
     loadSettings() {
         try {
             const settings = JSON.parse(localStorage.getItem('readalong-settings') || '{}');
 
             if (settings.fontSize) this.setFontSize(settings.fontSize);
+            if (settings.lineHeight) this.setLineSpacing(settings.lineHeight);
             if (settings.theme) this.setTheme(settings.theme);
+            if (settings.highlightStyle) {
+                this.setHighlightStyle(settings.highlightStyle);
+                document.getElementById('highlight-style').value = settings.highlightStyle;
+            }
             if (settings.speed) this.setSpeed(settings.speed);
             if (settings.autoScroll !== undefined) {
                 this.autoScroll = settings.autoScroll;
@@ -587,6 +912,25 @@ class ReadAlongReader {
             }
         } catch (e) {
             console.warn('Could not load settings:', e);
+        }
+    }
+
+    savePosition() {
+        if (!this.bookData) return;
+        const key = `position_${this.bookData.bookId}`;
+        localStorage.setItem(key, JSON.stringify({
+            chapter: this.currentChapter,
+            time: this.audio.currentTime
+        }));
+    }
+
+    getLastPosition() {
+        if (!this.bookData) return null;
+        const key = `position_${this.bookData.bookId}`;
+        try {
+            return JSON.parse(localStorage.getItem(key));
+        } catch (e) {
+            return null;
         }
     }
 }

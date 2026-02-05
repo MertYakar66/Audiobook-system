@@ -2,9 +2,10 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Read-Along Reader</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>">
 </head>
 <body>
     <div id="app">
@@ -19,15 +20,28 @@
                     </svg>
                 </button>
                 <div class="book-info">
-                    <h1 id="book-title">Select a Book</h1>
+                    <h1 id="book-title">Read-Along Reader</h1>
                     <span id="book-author"></span>
                 </div>
-                <button id="settings-btn" class="icon-btn" title="Settings">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="3"/>
-                        <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
-                    </svg>
-                </button>
+                <div class="header-actions">
+                    <button id="view-mode-btn" class="icon-btn" title="Toggle View Mode">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="7" height="18" rx="1"/>
+                            <rect x="14" y="3" width="7" height="18" rx="1"/>
+                        </svg>
+                    </button>
+                    <button id="bookmark-btn" class="icon-btn" title="Add Bookmark">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                        </svg>
+                    </button>
+                    <button id="settings-btn" class="icon-btn" title="Settings">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"/>
+                            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                        </svg>
+                    </button>
+                </div>
             </div>
         </header>
 
@@ -43,24 +57,60 @@
             <div id="empty-state" class="state-view active">
                 <div class="empty-icon">📚</div>
                 <h2>Welcome to Read-Along</h2>
-                <p>Drop a book folder here or select from the library</p>
+                <p>Experience synchronized audio-text reading with sentence highlighting</p>
+                <div class="feature-list">
+                    <div class="feature">🎧 Listen while you read</div>
+                    <div class="feature">✨ Sentence highlighting</div>
+                    <div class="feature">📄 View original pages</div>
+                    <div class="feature">🔖 Bookmarks & notes</div>
+                </div>
                 <button id="select-book-btn" class="primary-btn">Select Book Folder</button>
                 <input type="file" id="folder-input" webkitdirectory directory style="display: none;">
+                <p class="hint">Select a processed book folder containing manifest.json</p>
             </div>
 
             <!-- Reader View -->
             <div id="reader-view" class="reader">
                 <!-- Chapter Navigation -->
                 <nav class="chapter-nav">
-                    <button id="prev-chapter" class="chapter-btn" disabled>← Previous</button>
+                    <button id="prev-chapter" class="chapter-btn" disabled>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <polyline points="15 18 9 12 15 6"/>
+                        </svg>
+                        Prev
+                    </button>
                     <select id="chapter-select"></select>
-                    <button id="next-chapter" class="chapter-btn" disabled>Next →</button>
+                    <button id="next-chapter" class="chapter-btn" disabled>
+                        Next
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <polyline points="9 18 15 12 9 6"/>
+                        </svg>
+                    </button>
                 </nav>
 
-                <!-- Text Content -->
-                <article id="text-content" class="text-content">
-                    <!-- Paragraphs and sentences rendered here -->
-                </article>
+                <!-- Split View Container -->
+                <div id="split-container" class="split-container">
+                    <!-- Text Content Panel -->
+                    <div id="text-panel" class="panel text-panel">
+                        <article id="text-content" class="text-content">
+                            <!-- Paragraphs and sentences rendered here -->
+                        </article>
+                    </div>
+
+                    <!-- Page Viewer Panel (for original document) -->
+                    <div id="page-panel" class="panel page-panel hidden">
+                        <div class="page-controls">
+                            <button id="page-prev" class="page-nav-btn">‹</button>
+                            <span id="page-indicator">Page 1 / 1</span>
+                            <button id="page-next" class="page-nav-btn">›</button>
+                            <button id="page-zoom-out" class="page-zoom-btn">−</button>
+                            <button id="page-zoom-in" class="page-zoom-btn">+</button>
+                        </div>
+                        <div id="page-viewer" class="page-viewer">
+                            <img id="page-image" src="" alt="Document page">
+                        </div>
+                    </div>
+                </div>
             </div>
         </main>
 
@@ -72,22 +122,31 @@
             <div class="progress-container">
                 <div id="progress-bar" class="progress-bar">
                     <div id="progress-fill" class="progress-fill"></div>
+                    <div id="progress-buffer" class="progress-buffer"></div>
                     <div id="progress-handle" class="progress-handle"></div>
                 </div>
                 <div class="time-display">
                     <span id="current-time">0:00</span>
+                    <span id="chapter-title-display"></span>
                     <span id="total-time">0:00</span>
                 </div>
             </div>
 
             <!-- Controls -->
             <div class="controls">
+                <button id="sleep-timer" class="control-btn" title="Sleep Timer">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                    </svg>
+                    <span id="sleep-timer-value"></span>
+                </button>
+
                 <button id="skip-back" class="control-btn" title="Back 10s">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polygon points="11 19 2 12 11 5 11 19"/>
-                        <line x1="22" y1="12" x2="11" y2="12"/>
+                        <polygon points="22 19 13 12 22 5 22 19"/>
                     </svg>
-                    <span>10</span>
+                    <span class="skip-label">10</span>
                 </button>
 
                 <button id="play-pause" class="play-btn" title="Play/Pause">
@@ -103,13 +162,13 @@
                 <button id="skip-forward" class="control-btn" title="Forward 30s">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polygon points="13 19 22 12 13 5 13 19"/>
-                        <line x1="2" y1="12" x2="13" y2="12"/>
+                        <polygon points="2 19 11 12 2 5 2 19"/>
                     </svg>
-                    <span>30</span>
+                    <span class="skip-label">30</span>
                 </button>
 
                 <div class="speed-control">
-                    <button id="speed-btn" class="control-btn">
+                    <button id="speed-btn" class="control-btn" title="Playback Speed">
                         <span id="speed-value">1.0x</span>
                     </button>
                     <div id="speed-menu" class="speed-menu">
@@ -118,6 +177,7 @@
                         <button data-speed="1" class="active">1.0x</button>
                         <button data-speed="1.25">1.25x</button>
                         <button data-speed="1.5">1.5x</button>
+                        <button data-speed="1.75">1.75x</button>
                         <button data-speed="2">2.0x</button>
                     </div>
                 </div>
@@ -127,37 +187,115 @@
         <!-- Settings Panel -->
         <div id="settings-panel" class="settings-panel">
             <div class="settings-content">
-                <h2>Settings</h2>
+                <div class="settings-header">
+                    <h2>Settings</h2>
+                    <button id="close-settings" class="close-btn-x">&times;</button>
+                </div>
 
-                <div class="setting-group">
-                    <label>Font Size</label>
-                    <div class="font-size-controls">
-                        <button id="font-decrease">A-</button>
-                        <span id="font-size-value">18px</span>
-                        <button id="font-increase">A+</button>
+                <div class="settings-section">
+                    <h3>Reading</h3>
+
+                    <div class="setting-group">
+                        <label>Font Size</label>
+                        <div class="font-size-controls">
+                            <button id="font-decrease">A−</button>
+                            <span id="font-size-value">18px</span>
+                            <button id="font-increase">A+</button>
+                        </div>
+                    </div>
+
+                    <div class="setting-group">
+                        <label>Line Spacing</label>
+                        <div class="line-spacing-controls">
+                            <button data-spacing="1.4" class="spacing-btn">Compact</button>
+                            <button data-spacing="1.7" class="spacing-btn active">Normal</button>
+                            <button data-spacing="2.0" class="spacing-btn">Relaxed</button>
+                        </div>
+                    </div>
+
+                    <div class="setting-group">
+                        <label>Theme</label>
+                        <div class="theme-options">
+                            <button data-theme="light" class="theme-btn active">
+                                <span class="theme-preview light"></span>
+                                Light
+                            </button>
+                            <button data-theme="sepia" class="theme-btn">
+                                <span class="theme-preview sepia"></span>
+                                Sepia
+                            </button>
+                            <button data-theme="dark" class="theme-btn">
+                                <span class="theme-preview dark"></span>
+                                Dark
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                <div class="setting-group">
-                    <label>Theme</label>
-                    <div class="theme-options">
-                        <button data-theme="light" class="theme-btn active">Light</button>
-                        <button data-theme="sepia" class="theme-btn">Sepia</button>
-                        <button data-theme="dark" class="theme-btn">Dark</button>
+                <div class="settings-section">
+                    <h3>Playback</h3>
+
+                    <div class="setting-group">
+                        <label>Auto-Scroll</label>
+                        <label class="toggle">
+                            <input type="checkbox" id="auto-scroll" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+
+                    <div class="setting-group">
+                        <label>Highlight Style</label>
+                        <select id="highlight-style">
+                            <option value="background">Background</option>
+                            <option value="underline">Underline</option>
+                            <option value="bold">Bold</option>
+                        </select>
                     </div>
                 </div>
 
-                <div class="setting-group">
-                    <label>Auto-Scroll</label>
-                    <label class="toggle">
-                        <input type="checkbox" id="auto-scroll" checked>
-                        <span class="toggle-slider"></span>
-                    </label>
+                <div class="settings-section">
+                    <h3>Bookmarks</h3>
+                    <div id="bookmarks-list" class="bookmarks-list">
+                        <p class="no-bookmarks">No bookmarks yet</p>
+                    </div>
                 </div>
 
-                <button id="close-settings" class="close-btn">Close</button>
+                <div class="settings-footer">
+                    <button id="reset-settings" class="secondary-btn">Reset to Defaults</button>
+                </div>
             </div>
         </div>
+
+        <!-- Sleep Timer Modal -->
+        <div id="sleep-modal" class="modal hidden">
+            <div class="modal-content">
+                <h3>Sleep Timer</h3>
+                <div class="sleep-options">
+                    <button data-minutes="5">5 min</button>
+                    <button data-minutes="10">10 min</button>
+                    <button data-minutes="15">15 min</button>
+                    <button data-minutes="30">30 min</button>
+                    <button data-minutes="45">45 min</button>
+                    <button data-minutes="60">1 hour</button>
+                    <button data-minutes="0" class="cancel-sleep">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bookmark Modal -->
+        <div id="bookmark-modal" class="modal hidden">
+            <div class="modal-content">
+                <h3>Add Bookmark</h3>
+                <input type="text" id="bookmark-note" placeholder="Add a note (optional)">
+                <div class="modal-actions">
+                    <button id="cancel-bookmark" class="secondary-btn">Cancel</button>
+                    <button id="save-bookmark" class="primary-btn">Save</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast Notifications -->
+        <div id="toast-container" class="toast-container"></div>
     </div>
 
     <script src="reader.js"></script>
