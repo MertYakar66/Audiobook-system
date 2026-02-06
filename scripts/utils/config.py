@@ -135,6 +135,11 @@ class Config:
         """Check if GPU should be used."""
         return self.get("processing", "use_gpu", default=True)
 
+    @property
+    def voice_preset(self) -> str:
+        """Get the TTS quality preset."""
+        return self.get("voice", "preset", default="fast")
+
 
 # Singleton instance
 config = Config()

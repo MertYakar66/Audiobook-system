@@ -2,20 +2,27 @@
 # Edit these settings to customize your audiobook generation
 
 # =============================================================================
-# VOICE SETTINGS
+# VOICE SETTINGS (Tortoise TTS)
 # =============================================================================
 voice:
-  # Kokoro voice options:
-  # Female: af_sky (calm), af_bella, af_nicole, af_sarah
-  # Male: am_michael (calm), am_adam, am_fenrir
-  # Recommended for audiobooks: af_sky or am_michael (calm, neutral, non-theatrical)
-  default: "af_sky"
+  # Tortoise TTS voice options:
+  # Built-in: train_dotrice (narrator), train_kennard, emma, freeman, deniro, halle
+  # Custom: Create folder voices/<name>/ with 3-10 WAV samples (6-10s each)
+  # Recommended for audiobooks: train_dotrice (British, narrator-style)
+  default: "train_dotrice"
 
-  # Speech rate (1.0 = normal, 0.9 = slightly slower for better comprehension)
-  speed: 0.95
+  # Speech rate (affects pacing - 1.0 = normal)
+  speed: 1.0
 
   # Language code
   lang: "en-us"
+
+  # Quality preset: ultra_fast, fast, standard, high_quality
+  # ultra_fast: Testing only, poor quality
+  # fast: Good quality, reasonable speed (recommended for development)
+  # standard: High quality, slower
+  # high_quality: Best quality, very slow (use for final production)
+  preset: "fast"
 
 # =============================================================================
 # AUDIO SETTINGS
@@ -24,7 +31,7 @@ audio:
   # Output format for intermediate files
   intermediate_format: "wav"
 
-  # Sample rate (24000 is Kokoro's native rate)
+  # Sample rate (24000 is Tortoise TTS native rate)
   sample_rate: 24000
 
   # Final m4b quality settings

@@ -4,12 +4,16 @@ Book Processor Module - Enhanced Edition
 Orchestrates the complete Read-Along book processing pipeline.
 Converts books to synchronized audio-text format with timing maps.
 
+Now uses Tortoise TTS for high-quality, natural speech with voice cloning.
+
 Features:
 - Resume interrupted processing from last completed chapter
 - Extract original document pages (images) for viewing
 - Progress state persistence
 - Memory-optimized batch processing
 - GPU acceleration support
+- Voice cloning from custom audio samples
+- Quality presets (ultra_fast, fast, standard, high_quality)
 """
 
 import gc
@@ -74,8 +78,9 @@ class ProcessingState:
     chapter_data: Dict[str, Any] = field(default_factory=dict)
     started_at: str = ""
     last_updated: str = ""
-    voice: str = "af_sky"
+    voice: str = "train_dotrice"
     speed: float = 1.0
+    preset: str = "fast"
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -90,6 +95,7 @@ class ProcessingState:
             "last_updated": self.last_updated,
             "voice": self.voice,
             "speed": self.speed,
+            "preset": self.preset,
         }
 
     @classmethod
@@ -104,8 +110,9 @@ class ProcessingState:
             chapter_data=data.get("chapter_data", {}),
             started_at=data.get("started_at", ""),
             last_updated=data.get("last_updated", ""),
-            voice=data.get("voice", "af_sky"),
+            voice=data.get("voice", "train_dotrice"),
             speed=data.get("speed", 1.0),
+            preset=data.get("preset", "fast"),
         )
 
     def save(self, path: Path) -> None:
@@ -150,17 +157,24 @@ class BookProcessor:
         self,
         voice: Optional[str] = None,
         speed: Optional[float] = None,
+        preset: Optional[str] = None,
     ):
         """
         Initialize book processor.
 
         Args:
-            voice: TTS voice to use
+            voice: TTS voice to use (built-in or custom)
             speed: Speech speed multiplier
+            preset: TTS quality preset (ultra_fast, fast, standard, high_quality)
         """
         self.voice = voice or config.voice
         self.speed = speed or config.voice_speed
-        self.tts = TimedTTSGenerator(voice=self.voice, speed=self.speed)
+        self.preset = preset or config.voice_preset
+        self.tts = TimedTTSGenerator(
+            voice=self.voice,
+            speed=self.speed,
+            preset=self.preset,
+        )
         self.cleaner = TextCleaner()
         self.chapter_detector = ChapterDetector()
         self.metadata_extractor = MetadataExtractor()
@@ -254,6 +268,7 @@ class BookProcessor:
                 started_at=datetime.now().isoformat(),
                 voice=self.voice,
                 speed=self.speed,
+                preset=self.preset,
             )
             state.save(state_path)
 
@@ -689,6 +704,8 @@ class BookProcessor:
             "generated": {
                 "voice": self.voice,
                 "speed": self.speed,
+                "preset": self.preset,
+                "tts_engine": "tortoise",
                 "timestamp": datetime.now().isoformat(),
             },
         }
@@ -776,6 +793,7 @@ def process_readalong(
     input_path: Path,
     output_dir: Optional[Path] = None,
     voice: Optional[str] = None,
+    preset: Optional[str] = None,
     title: Optional[str] = None,
     author: Optional[str] = None,
     resume: bool = True,
@@ -787,6 +805,7 @@ def process_readalong(
         input_path: Path to input file (PDF, DOCX, TXT)
         output_dir: Output directory
         voice: TTS voice to use
+        preset: TTS quality preset (ultra_fast, fast, standard, high_quality)
         title: Override book title
         author: Override author name
         resume: Resume from previous progress if available
@@ -794,7 +813,7 @@ def process_readalong(
     Returns:
         ProcessedBook result
     """
-    processor = BookProcessor(voice=voice)
+    processor = BookProcessor(voice=voice, preset=preset)
     return processor.process_book(
         input_path,
         output_dir=output_dir,

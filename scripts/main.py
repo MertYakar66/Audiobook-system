@@ -3,12 +3,14 @@
 Audiobook Generation System - Main CLI
 
 Professional-grade pipeline for converting PDF/text files to M4B audiobooks.
-Uses Kokoro-82M TTS for high-quality, natural-sounding narration.
+Uses Tortoise TTS for high-quality, natural-sounding narration with voice cloning.
 
 Features:
 - PDF text extraction with intelligent cleaning
 - Automatic chapter detection
-- Multiple voice options (American/British, Male/Female)
+- Voice cloning from reference audio samples
+- Multiple built-in voices (train_dotrice, emma, freeman, etc.)
+- Quality presets (ultra_fast, fast, standard, high_quality)
 - Embedded chapter markers for easy navigation
 - Cover art and metadata support
 - Audiobookshelf integration for playback
@@ -97,6 +99,12 @@ def cli():
     is_flag=True,
     help="Keep intermediate audio files",
 )
+@click.option(
+    "-p", "--preset",
+    default=None,
+    type=click.Choice(["ultra_fast", "fast", "standard", "high_quality"]),
+    help="TTS quality preset (default: fast)",
+)
 def convert(
     input_file: str,
     output: Optional[str],
@@ -108,6 +116,7 @@ def convert(
     skip_pages: str,
     no_chapters: bool,
     keep_intermediate: bool,
+    preset: Optional[str],
 ):
     """
     Convert a PDF or text file to an M4B audiobook.
@@ -198,7 +207,10 @@ def convert(
 
         # Step 5: Generate audio for each chapter
         logger.step("Generating audio", 5, 6)
-        tts = TTSGenerator(voice=voice or config.voice)
+        tts = TTSGenerator(
+            voice=voice or config.voice,
+            preset=preset or config.voice_preset,
+        )
 
         chapter_audio_files = []
         chapter_titles = []
@@ -352,16 +364,17 @@ def chapters(input_file: str):
 @click.option("-v", "--voice", default=None, help="Voice to test")
 @click.option("-t", "--text", default="Hello! This is a test of the audiobook generation system.", help="Text to speak")
 @click.option("-o", "--output", type=click.Path(), default="test_output.wav", help="Output file")
-def test_voice(voice: Optional[str], text: str, output: str):
+@click.option("-p", "--preset", default="fast", type=click.Choice(["ultra_fast", "fast", "standard", "high_quality"]), help="Quality preset")
+def test_voice(voice: Optional[str], text: str, output: str, preset: str):
     """
     Test TTS voice generation.
 
     Quick way to preview a voice before full conversion.
     """
     voice = voice or config.voice
-    logger.header(f"Testing voice: {voice}")
+    logger.header(f"Testing voice: {voice} (preset: {preset})")
 
-    tts = TTSGenerator(voice=voice)
+    tts = TTSGenerator(voice=voice, preset=preset)
     output_path = Path(output)
 
     generated_path, duration = tts.generate_audio(text, output_path)
@@ -374,32 +387,52 @@ def test_voice(voice: Optional[str], text: str, output: str):
 @cli.command()
 def list_voices():
     """
-    List available Kokoro voices.
+    List available Tortoise TTS voices.
     """
-    logger.header("Available Kokoro Voices")
+    logger.header("Available Tortoise TTS Voices")
 
+    # Built-in voices by category
     voices = {
-        "Female": [
-            ("af_sky", "Calm, neutral (recommended)"),
-            ("af_bella", "Warm, expressive"),
-            ("af_nicole", "Professional"),
-            ("af_sarah", "Friendly"),
+        "Recommended for Audiobooks": [
+            ("train_dotrice", "British, narrator-style (default)"),
+            ("train_kennard", "Male, warm and clear"),
+            ("train_grace", "Female, elegant"),
         ],
-        "Male": [
-            ("am_michael", "Calm, neutral (recommended)"),
-            ("am_adam", "Deep, authoritative"),
-            ("am_fenrir", "Casual"),
+        "Male Voices": [
+            ("freeman", "Deep, authoritative"),
+            ("deniro", "Casual, conversational"),
+            ("tom", "Clear, neutral"),
+            ("william", "British, refined"),
+            ("geralt", "Deep, dramatic"),
+        ],
+        "Female Voices": [
+            ("emma", "British, warm"),
+            ("halle", "American, professional"),
+            ("jlaw", "American, casual"),
+            ("angie", "Expressive"),
+            ("mol", "Clear, neutral"),
         ],
     }
 
     for category, voice_list in voices.items():
         logger.console.print(f"\n[bold]{category}[/bold]")
         for voice_id, description in voice_list:
-            marker = "*" if voice_id in ("af_sky", "am_michael") else " "
-            logger.console.print(f"  {marker} {voice_id:<15} - {description}")
+            marker = "*" if voice_id == "train_dotrice" else " "
+            logger.console.print(f"  {marker} {voice_id:<18} - {description}")
 
-    logger.console.print("\n* Recommended for audiobooks")
-    logger.console.print(f"\nCurrent default: {config.voice}")
+    logger.console.print("\n[bold]Quality Presets:[/bold]")
+    logger.console.print("  ultra_fast  - Quick preview, lower quality")
+    logger.console.print("  fast        - Good quality, reasonable speed (default)")
+    logger.console.print("  standard    - High quality, slower")
+    logger.console.print("  high_quality - Best quality, very slow")
+
+    logger.console.print("\n[bold]Voice Cloning:[/bold]")
+    logger.console.print("  1. Create folder: voices/<voice_name>/")
+    logger.console.print("  2. Add 3-10 WAV files (6-10 seconds each)")
+    logger.console.print("  3. Use: --voice <voice_name>")
+
+    logger.console.print(f"\n* Current default: {config.voice}")
+    logger.console.print(f"  Current preset: {config.voice_preset}")
 
 
 @cli.command()
@@ -430,6 +463,12 @@ def list_voices():
     type=int,
     help="Chapter numbers to skip (use multiple times: --skip-chapters 1 --skip-chapters 2)",
 )
+@click.option(
+    "-p", "--preset",
+    default=None,
+    type=click.Choice(["ultra_fast", "fast", "standard", "high_quality"]),
+    help="TTS quality preset (default: fast)",
+)
 def readalong(
     input_file: str,
     output: Optional[str],
@@ -437,6 +476,7 @@ def readalong(
     title: Optional[str],
     author: Optional[str],
     skip_chapters: tuple,
+    preset: Optional[str],
 ):
     """
     Create a Read-Along book with synchronized audio and text.
@@ -452,7 +492,7 @@ def readalong(
     """
     input_path = Path(input_file)
 
-    processor = BookProcessor(voice=voice)
+    processor = BookProcessor(voice=voice, preset=preset)
     result = processor.process_book(
         input_path,
         output_dir=Path(output) if output else None,
@@ -480,9 +520,10 @@ def info():
     logger.console.print(f"  Input:        {config.get_path('input')}")
     logger.console.print(f"  Output:       {config.get_path('output')}")
 
-    logger.console.print("\n[bold]Voice Settings:[/bold]")
+    logger.console.print("\n[bold]Voice Settings (Tortoise TTS):[/bold]")
     logger.console.print(f"  Default voice: {config.voice}")
     logger.console.print(f"  Speed:         {config.voice_speed}")
+    logger.console.print(f"  Preset:        {config.voice_preset}")
     logger.console.print(f"  Language:      {config.get('voice', 'lang')}")
 
     logger.console.print("\n[bold]Audio Settings:[/bold]")
@@ -501,12 +542,21 @@ def info():
         status = "[green]OK[/green]" if path else "[red]NOT FOUND[/red]"
         logger.console.print(f"  {tool:<12} {status}")
 
-    # Check for Kokoro TTS
+    # Check for Tortoise TTS
     try:
-        import kokoro
-        logger.console.print(f"  {'kokoro':<12} [green]OK[/green]")
+        import tortoise
+        logger.console.print(f"  {'tortoise':<12} [green]OK[/green]")
     except ImportError:
-        logger.console.print(f"  {'kokoro':<12} [red]NOT FOUND[/red]")
+        logger.console.print(f"  {'tortoise':<12} [red]NOT FOUND[/red]")
+
+    # Check for custom voices
+    voices_dir = config.project_root / "voices"
+    if voices_dir.exists():
+        custom_voices = [d.name for d in voices_dir.iterdir() if d.is_dir() and list(d.glob("*.wav"))]
+        if custom_voices:
+            logger.console.print(f"\n[bold]Custom Voices:[/bold]")
+            for v in custom_voices:
+                logger.console.print(f"  {v}")
 
 
 def main():
