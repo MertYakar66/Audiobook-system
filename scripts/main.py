@@ -513,6 +513,8 @@ def info():
     """
     Show system information and configuration.
     """
+    from scripts.generate_audio import get_tts_engine, is_tortoise_available
+
     logger.header("Audiobook Generation System")
 
     logger.console.print("[bold]Paths:[/bold]")
@@ -520,7 +522,19 @@ def info():
     logger.console.print(f"  Input:        {config.get_path('input')}")
     logger.console.print(f"  Output:       {config.get_path('output')}")
 
-    logger.console.print("\n[bold]Voice Settings (Tortoise TTS):[/bold]")
+    # Show TTS engine status
+    tts_engine = get_tts_engine()
+    logger.console.print("\n[bold]TTS Engine:[/bold]")
+    if tts_engine == "tortoise":
+        logger.console.print(f"  Engine:        [green]Tortoise TTS[/green] (high quality)")
+    elif tts_engine == "pyttsx3":
+        logger.console.print(f"  Engine:        [yellow]pyttsx3[/yellow] (fallback - lower quality)")
+        logger.console.print(f"  [dim]Run .\\install_tortoise.ps1 for better quality[/dim]")
+    else:
+        logger.console.print(f"  Engine:        [red]NONE[/red]")
+        logger.console.print(f"  [red]Install TTS: pip install pyttsx3  (or run install_tortoise script)[/red]")
+
+    logger.console.print("\n[bold]Voice Settings:[/bold]")
     logger.console.print(f"  Default voice: {config.voice}")
     logger.console.print(f"  Speed:         {config.voice_speed}")
     logger.console.print(f"  Preset:        {config.voice_preset}")
@@ -547,7 +561,14 @@ def info():
         import tortoise
         logger.console.print(f"  {'tortoise':<12} [green]OK[/green]")
     except ImportError:
-        logger.console.print(f"  {'tortoise':<12} [red]NOT FOUND[/red]")
+        logger.console.print(f"  {'tortoise':<12} [yellow]NOT INSTALLED[/yellow] (using fallback)")
+
+    # Check for pyttsx3 fallback
+    try:
+        import pyttsx3
+        logger.console.print(f"  {'pyttsx3':<12} [green]OK[/green] (fallback available)")
+    except ImportError:
+        logger.console.print(f"  {'pyttsx3':<12} [dim]NOT INSTALLED[/dim]")
 
     # Check for custom voices
     voices_dir = config.project_root / "voices"
@@ -557,6 +578,16 @@ def info():
             logger.console.print(f"\n[bold]Custom Voices:[/bold]")
             for v in custom_voices:
                 logger.console.print(f"  {v}")
+
+
+@cli.command()
+def diagnose():
+    """
+    Run TTS diagnostics to troubleshoot installation issues.
+    """
+    import subprocess
+    import sys
+    subprocess.run([sys.executable, "-m", "scripts.diagnose_tts"])
 
 
 def main():

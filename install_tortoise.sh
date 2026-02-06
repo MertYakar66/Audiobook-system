@@ -9,42 +9,49 @@ echo "  Tortoise TTS Installation for Python 3.13"
 echo "============================================"
 echo ""
 
-# Check Python version
+# Check Python version and path
 PYTHON_VERSION=$(python3 --version 2>&1)
+PYTHON_PATH=$(python3 -c "import sys; print(sys.executable)" 2>&1)
 echo "Python version: $PYTHON_VERSION"
+echo "Python path: $PYTHON_PATH"
 
 # Step 1: Upgrade pip
 echo ""
-echo "[1/5] Upgrading pip..."
-pip install --upgrade pip
+echo "[1/6] Upgrading pip..."
+python3 -m pip install --upgrade pip
 
 # Step 2: Install PyTorch
 echo ""
-echo "[2/5] Installing PyTorch..."
+echo "[2/6] Installing PyTorch..."
 
 # Check for CUDA
 if command -v nvidia-smi &> /dev/null; then
     echo "  CUDA detected! Installing PyTorch with CUDA support..."
-    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+    python3 -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 else
     echo "  CUDA not detected. Installing CPU-only PyTorch..."
-    pip install torch torchvision torchaudio
+    python3 -m pip install torch torchvision torchaudio
 fi
 
 # Step 3: Install compatible transformers and tokenizers FIRST
 echo ""
-echo "[3/5] Installing transformers with compatible tokenizers..."
-pip install "tokenizers>=0.14.0" "transformers>=4.35.0"
+echo "[3/6] Installing transformers with compatible tokenizers..."
+python3 -m pip install "tokenizers>=0.14.0" "transformers>=4.35.0"
 
 # Step 4: Install other Tortoise dependencies
 echo ""
-echo "[4/5] Installing Tortoise TTS dependencies..."
-pip install einops rotary-embedding-torch inflect progressbar2 unidecode scipy librosa soundfile
+echo "[4/6] Installing Tortoise TTS dependencies..."
+python3 -m pip install einops rotary-embedding-torch inflect progressbar2 unidecode scipy librosa soundfile
 
-# Step 5: Install Tortoise TTS without dependencies
+# Step 5: Uninstall any existing tortoise-tts to avoid conflicts
 echo ""
-echo "[5/5] Installing Tortoise TTS..."
-pip install tortoise-tts --no-deps
+echo "[5/6] Cleaning up old Tortoise installations..."
+python3 -m pip uninstall tortoise-tts -y 2>/dev/null || true
+
+# Step 6: Install Tortoise TTS from GitHub (more reliable than PyPI)
+echo ""
+echo "[6/6] Installing Tortoise TTS from GitHub..."
+python3 -m pip install git+https://github.com/neonbjb/tortoise-tts.git
 
 # Verify installation
 echo ""
@@ -54,6 +61,14 @@ echo "============================================"
 
 python3 -c "
 import sys
+import site
+
+print('Python paths:')
+for p in sys.path[:5]:
+    print(f'  {p}')
+
+print()
+
 try:
     import torch
     print(f'  torch: OK (version {torch.__version__})')
@@ -72,23 +87,50 @@ except ImportError as e:
     sys.exit(1)
 
 try:
-    from tortoise.api import TextToSpeech
-    print('  tortoise: OK')
+    import tortoise
+    print(f'  tortoise module: OK (location: {tortoise.__file__})')
 except ImportError as e:
-    print(f'  tortoise: FAILED - {e}')
+    print(f'  tortoise module: FAILED - {e}')
+    # Check if it exists in site-packages
+    for sp in site.getsitepackages():
+        import os
+        tortoise_path = os.path.join(sp, 'tortoise')
+        if os.path.exists(tortoise_path):
+            print(f'    Found tortoise at: {tortoise_path}')
+    sys.exit(1)
+
+try:
+    from tortoise.api import TextToSpeech
+    print('  tortoise.api.TextToSpeech: OK')
+except ImportError as e:
+    print(f'  tortoise.api.TextToSpeech: FAILED - {e}')
     sys.exit(1)
 
 print()
 print('All imports successful!')
 "
 
-echo ""
-echo "============================================"
-echo "  Installation Complete!"
-echo "============================================"
-echo ""
-echo "You can now generate audiobooks with:"
-echo "  python -m scripts.main convert \"input/The_Intelligent_Investor_Clean.docx\""
-echo ""
-echo "Or test a voice with:"
-echo "  python -m scripts.main test-voice --preset ultra_fast"
+if [ $? -eq 0 ]; then
+    echo ""
+    echo "============================================"
+    echo "  Installation Complete!"
+    echo "============================================"
+    echo ""
+    echo "You can now generate audiobooks with:"
+    echo "  python -m scripts.main convert \"input/The_Intelligent_Investor_Clean.docx\""
+    echo ""
+    echo "Or test a voice with:"
+    echo "  python -m scripts.main test-voice --preset ultra_fast"
+else
+    echo ""
+    echo "============================================"
+    echo "  Installation had issues!"
+    echo "============================================"
+    echo ""
+    echo "Run diagnostics: python -m scripts.diagnose_tts"
+    echo ""
+    echo "Or try a fresh virtual environment:"
+    echo "  python3 -m venv tts_venv"
+    echo "  source tts_venv/bin/activate"
+    echo "  ./install_tortoise.sh"
+fi
