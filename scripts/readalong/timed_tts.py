@@ -16,7 +16,9 @@ _tts_engine = None
 _tts_error = None
 
 # Check if CUDA is explicitly disabled (CPU mode requested)
-_cuda_disabled = os.environ.get("CUDA_VISIBLE_DEVICES", "") in ["-1", ""]
+# Only treat as disabled if explicitly set to "-1", not if unset
+_cuda_env = os.environ.get("CUDA_VISIBLE_DEVICES")
+_cuda_disabled = _cuda_env == "-1"  # Only disabled if explicitly set to -1
 _force_cpu = os.environ.get("FORCE_CPU_TTS", "").lower() in ["1", "true", "yes"]
 
 # Check if torch and CUDA are available
