@@ -28,7 +28,12 @@ scipy>=1.11.0            # Scientific computing
 librosa>=0.10.0          # Audio analysis
 
 # ============================================================================
-# TTS - Tortoise TTS Dependencies
+# TTS - Edge TTS (Recommended - fast, high quality, no GPU needed)
+# ============================================================================
+edge-tts>=6.1.0          # Microsoft Edge neural TTS (fast, free, high quality)
+
+# ============================================================================
+# TTS - Tortoise TTS Dependencies (Optional - slow but highest quality)
 # Install these FIRST, then run: pip install tortoise-tts --no-deps
 # ============================================================================
 torch>=2.0.0             # PyTorch (install separately with CUDA if needed)

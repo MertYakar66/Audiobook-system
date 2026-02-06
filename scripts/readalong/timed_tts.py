@@ -4,8 +4,15 @@ Timed TTS Generator
 Generates audio with precise timing information for each sentence.
 Captures start/end timestamps for Read-Along synchronization.
 
-Uses Tortoise TTS for high-quality, natural speech (requires GPU).
-Falls back to pyttsx3 (system TTS) if Tortoise is not available or GPU unavailable.
+TTS Engine Priority:
+1. edge-tts (fast, high-quality neural voices, no GPU needed) - DEFAULT
+2. Tortoise TTS (highest quality, but very slow, requires GPU)
+3. pyttsx3 (system TTS fallback, lower quality)
+
+Set TTS_ENGINE environment variable to override:
+  TTS_ENGINE=edge      # Use Edge TTS (default)
+  TTS_ENGINE=tortoise  # Use Tortoise TTS (slow but highest quality)
+  TTS_ENGINE=pyttsx3   # Use system TTS
 """
 
 import os
@@ -15,8 +22,10 @@ import warnings
 _tts_engine = None
 _tts_error = None
 
+# Check user preference
+_preferred_engine = os.environ.get("TTS_ENGINE", "edge").lower()
+
 # Check if CUDA is explicitly disabled (CPU mode requested)
-# Only treat as disabled if explicitly set to "-1", not if unset
 _cuda_env = os.environ.get("CUDA_VISIBLE_DEVICES")
 _cuda_disabled = _cuda_env == "-1"  # Only disabled if explicitly set to -1
 _force_cpu = os.environ.get("FORCE_CPU_TTS", "").lower() in ["1", "true", "yes"]
@@ -31,24 +40,50 @@ try:
 except ImportError:
     pass
 
-# Use pyttsx3 for CPU mode (Tortoise on CPU is too slow and can crash)
-# Only use Tortoise if GPU is available
-try:
-    if not _torch_available:
-        raise ImportError("torch not available")
-    if not _cuda_available or _force_cpu:
-        raise ImportError("GPU not available - using pyttsx3 for CPU mode")
-    from scripts.readalong.timed_tts_tortoise import (
-        TimedTortoiseTTSGenerator as TimedTTSGenerator,
-        TimedSegment,
-        generate_with_timing,
-    )
-    from scripts.readalong.timed_tts_tortoise import TimedTortoiseTTSGenerator
-    _tts_engine = "tortoise"
 
-except ImportError as e:
-    _tts_error = str(e)
-    # Fall back to pyttsx3
+def _try_edge_tts():
+    """Try to load edge-tts."""
+    global _tts_engine, _tts_error
+    try:
+        from scripts.readalong.timed_tts_edge import (
+            TimedEdgeTTSGenerator as TimedTTSGenerator,
+            TimedSegment,
+            generate_with_timing,
+        )
+        from scripts.readalong.timed_tts_edge import TimedEdgeTTSGenerator
+        _tts_engine = "edge"
+        return TimedTTSGenerator, TimedEdgeTTSGenerator, TimedSegment, generate_with_timing
+    except ImportError as e:
+        _tts_error = str(e)
+        return None
+
+
+def _try_tortoise_tts():
+    """Try to load Tortoise TTS (requires GPU)."""
+    global _tts_engine, _tts_error
+    if not _torch_available:
+        _tts_error = "torch not available"
+        return None
+    if not _cuda_available or _force_cpu:
+        _tts_error = "GPU not available - Tortoise requires GPU"
+        return None
+    try:
+        from scripts.readalong.timed_tts_tortoise import (
+            TimedTortoiseTTSGenerator as TimedTTSGenerator,
+            TimedSegment,
+            generate_with_timing,
+        )
+        from scripts.readalong.timed_tts_tortoise import TimedTortoiseTTSGenerator
+        _tts_engine = "tortoise"
+        return TimedTTSGenerator, TimedTortoiseTTSGenerator, TimedSegment, generate_with_timing
+    except ImportError as e:
+        _tts_error = str(e)
+        return None
+
+
+def _try_pyttsx3():
+    """Try to load pyttsx3 fallback."""
+    global _tts_engine, _tts_error
     try:
         from scripts.readalong.timed_tts_pyttsx3 import (
             TimedPyttsx3TTSGenerator as TimedTTSGenerator,
@@ -56,63 +91,96 @@ except ImportError as e:
             generate_with_timing,
         )
         from scripts.readalong.timed_tts_pyttsx3 import TimedPyttsx3TTSGenerator
-
-        # Alias for compatibility
-        TimedTortoiseTTSGenerator = TimedPyttsx3TTSGenerator
-
         _tts_engine = "pyttsx3"
+        return TimedTTSGenerator, TimedPyttsx3TTSGenerator, TimedSegment, generate_with_timing
+    except ImportError as e:
+        _tts_error = f"pyttsx3: {e}"
+        return None
 
+
+# Load TTS engine based on preference
+_loaded = None
+
+if _preferred_engine == "tortoise":
+    # User explicitly wants Tortoise
+    _loaded = _try_tortoise_tts()
+    if not _loaded:
         warnings.warn(
-            f"Tortoise TTS not available ({_tts_error}), using pyttsx3 fallback. "
-            "Quality will be lower. Run 'python -m scripts.diagnose_tts' for help.",
+            f"Tortoise TTS not available ({_tts_error}), trying edge-tts...",
             UserWarning
         )
+        _loaded = _try_edge_tts()
 
-    except ImportError as e2:
-        # Neither TTS is available
-        _tts_error = f"Tortoise: {_tts_error}, pyttsx3: {e2}"
+elif _preferred_engine == "pyttsx3":
+    # User explicitly wants pyttsx3
+    _loaded = _try_pyttsx3()
 
-        from dataclasses import dataclass
-        from typing import Optional
-        import numpy as np
+else:
+    # Default: try edge-tts first (fast and good quality)
+    _loaded = _try_edge_tts()
+    if not _loaded:
+        warnings.warn(
+            f"Edge TTS not available ({_tts_error}), trying Tortoise...",
+            UserWarning
+        )
+        _loaded = _try_tortoise_tts()
 
-        @dataclass
-        class TimedSegment:
-            """Audio segment with timing information."""
-            sentence_id: str
-            text: str
-            start_time: float
-            end_time: float
-            audio_data: Optional[np.ndarray] = None
+# Fallback to pyttsx3 if nothing else worked
+if not _loaded:
+    _loaded = _try_pyttsx3()
 
-            @property
-            def duration(self) -> float:
-                return self.end_time - self.start_time
+# Set up exports
+if _loaded:
+    TimedTTSGenerator, TimedTortoiseTTSGenerator, TimedSegment, generate_with_timing = _loaded
+else:
+    # No TTS available
+    from dataclasses import dataclass
+    from typing import Optional
+    import numpy as np
 
-        class TTSNotAvailableError(Exception):
-            pass
+    @dataclass
+    class TimedSegment:
+        """Audio segment with timing information."""
+        sentence_id: str
+        text: str
+        start_time: float
+        end_time: float
+        audio_data: Optional[np.ndarray] = None
 
-        def generate_with_timing(*args, **kwargs):
-            raise TTSNotAvailableError(
-                "No TTS engine available!\n"
-                "Please install one of:\n"
-                "  1. Tortoise TTS: pip install tortoise-tts\n"
-                "  2. pyttsx3 (fallback): pip install pyttsx3\n"
-                f"\nOriginal errors: {_tts_error}"
-            )
+        @property
+        def duration(self) -> float:
+            return self.end_time - self.start_time
 
-        class TimedTTSGenerator:
-            def __init__(self, *args, **kwargs):
-                raise TTSNotAvailableError("No TTS engine available")
+    class TTSNotAvailableError(Exception):
+        pass
 
-        TimedTortoiseTTSGenerator = TimedTTSGenerator
+    def generate_with_timing(*args, **kwargs):
+        raise TTSNotAvailableError(
+            "No TTS engine available!\n"
+            "Please install one of:\n"
+            "  1. edge-tts (recommended): pip install edge-tts\n"
+            "  2. Tortoise TTS: pip install tortoise-tts\n"
+            "  3. pyttsx3 (fallback): pip install pyttsx3\n"
+            f"\nOriginal errors: {_tts_error}"
+        )
 
-        _tts_engine = None
+    class TimedTTSGenerator:
+        def __init__(self, *args, **kwargs):
+            raise TTSNotAvailableError("No TTS engine available")
+
+    TimedTortoiseTTSGenerator = TimedTTSGenerator
+
+    _tts_engine = None
 
 
 def get_tts_engine():
     """Return the name of the currently active TTS engine."""
     return _tts_engine
+
+
+def is_edge_available():
+    """Check if Edge TTS is available."""
+    return _tts_engine == "edge"
 
 
 def is_tortoise_available():
@@ -131,6 +199,7 @@ __all__ = [
     "TimedSegment",
     "generate_with_timing",
     "get_tts_engine",
+    "is_edge_available",
     "is_tortoise_available",
     "is_pyttsx3_available",
 ]
@@ -142,29 +211,35 @@ if __name__ == "__main__":
     print()
     print(f"Active TTS engine: {_tts_engine or 'NONE'}")
 
-    if _tts_engine == "tortoise":
+    if _tts_engine == "edge":
         print()
-        print("Using Tortoise TTS (high quality)")
+        print("Using Edge TTS (fast, neural voices)")
+        print("To use Tortoise instead: set TTS_ENGINE=tortoise")
+
+    elif _tts_engine == "tortoise":
+        print()
+        print("Using Tortoise TTS (high quality, slow)")
+        print("To use Edge TTS instead: set TTS_ENGINE=edge")
 
     elif _tts_engine == "pyttsx3":
         print()
         print("Using pyttsx3 fallback (system TTS)")
-        print(f"Tortoise not available: {_tts_error}")
         print()
-        print("For higher quality, install Tortoise TTS:")
-        print("  .\\install_tortoise.ps1  (Windows)")
-        print("  ./install_tortoise.sh   (Linux/Mac)")
+        print("For better quality, install edge-tts:")
+        print("  pip install edge-tts")
 
     else:
         print()
         print("ERROR: No TTS engine available!")
         print()
         print("Please install one of:")
-        print("  1. Tortoise TTS (high quality):")
-        print("     .\\install_tortoise.ps1  (Windows)")
-        print("     ./install_tortoise.sh   (Linux/Mac)")
+        print("  1. Edge TTS (recommended, fast):")
+        print("     pip install edge-tts")
         print()
-        print("  2. pyttsx3 (fallback, lower quality):")
+        print("  2. Tortoise TTS (high quality, slow):")
+        print("     pip install tortoise-tts")
+        print()
+        print("  3. pyttsx3 (fallback, lower quality):")
         print("     pip install pyttsx3")
         print()
         if _tts_error:
