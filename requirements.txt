@@ -1,40 +1,63 @@
 # Audiobook Generation System - Python Dependencies
-#
-# IMPORTANT: Requires Python 3.10-3.12 (Python 3.13+ is NOT supported)
-# Audiblez/Kokoro has a hard dependency on Python <3.13
-#
+# Supports Python 3.10-3.13
+# Uses Tortoise TTS for high-quality speech synthesis
 
+# ============================================================================
 # Document Processing
+# ============================================================================
 PyMuPDF>=1.23.0          # PDF text extraction (fitz)
 pdfplumber>=0.10.0       # Alternative PDF extraction
 python-docx>=1.0.0       # DOCX file support
 
+# ============================================================================
 # Text Processing
+# ============================================================================
 nltk>=3.8.0              # Natural language processing
 regex>=2023.0.0          # Advanced regex patterns
 chardet>=5.0.0           # Character encoding detection
 ftfy>=6.1.0              # Fix text encoding issues
 
+# ============================================================================
 # Audio Processing
+# ============================================================================
 pydub>=0.25.0            # Audio manipulation
 mutagen>=1.47.0          # Audio metadata handling
 soundfile>=0.12.0        # WAV file I/O
 numpy>=1.24.0            # Audio array processing
+scipy>=1.11.0            # Scientific computing
+librosa>=0.10.0          # Audio analysis
 
-# TTS - Kokoro (direct API, not audiblez CLI)
-kokoro>=0.3.0            # Kokoro TTS engine (Python API)
+# ============================================================================
+# TTS - Tortoise TTS Dependencies
+# Install these FIRST, then run: pip install tortoise-tts --no-deps
+# ============================================================================
+torch>=2.0.0             # PyTorch (install separately with CUDA if needed)
+torchaudio>=2.0.0        # Audio processing for PyTorch
+transformers>=4.35.0     # Hugging Face transformers (newer version works!)
+tokenizers>=0.14.0       # Fast tokenizers (prebuilt for Python 3.13)
+einops>=0.6.0            # Tensor operations
+rotary-embedding-torch>=0.3.0  # Rotary embeddings
+inflect>=7.0.0           # Number to word conversion
+progressbar2>=4.0.0      # Progress bars
+unidecode>=1.3.0         # Unicode to ASCII
 
+# ============================================================================
 # Audiobook Creation
+# ============================================================================
 ffmpeg-python>=0.2.0     # FFmpeg wrapper for m4b creation
 
+# ============================================================================
 # Utilities
+# ============================================================================
 click>=8.1.0             # CLI framework
 rich>=13.0.0             # Beautiful terminal output
 pyyaml>=6.0.0            # Configuration files
 tqdm>=4.66.0             # Progress bars
 Pillow>=10.0.0           # Image processing (covers)
-requests>=2.31.0         # HTTP requests (for cover downloads)
+requests>=2.31.0         # HTTP requests
 
-# Optional: For advanced chapter detection
+# ============================================================================
+# Optional: For advanced features
+# ============================================================================
 ebooklib>=0.18           # EPUB support
 beautifulsoup4>=4.12.0   # HTML parsing

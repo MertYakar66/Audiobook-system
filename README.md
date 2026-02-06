@@ -1,10 +1,11 @@
 # Audiobook Generation System
 
-A private, local audiobook generation system that converts PDF books into high-quality M4B audiobooks with chapter markers, metadata, and cover art. Now with **Read-Along mode** for synchronized audio-text reading.
+A private, local audiobook generation system that converts PDF books into high-quality M4B audiobooks with chapter markers, metadata, and cover art. Now with **Read-Along mode** for synchronized audio-text reading and **voice cloning** support.
 
 ## Features
 
-- **High-Quality TTS**: Uses Kokoro-82M for natural-sounding narration
+- **High-Quality TTS**: Uses Tortoise TTS for natural, expressive narration
+- **Voice Cloning**: Clone any voice from audio samples
 - **Chapter Detection**: Automatic chapter detection and embedded chapter markers
 - **Metadata Support**: Title, author, narrator, and cover art embedding
 - **M4B Output**: Industry-standard audiobook format compatible with all players
@@ -22,31 +23,30 @@ The Read-Along feature provides an Everand-like experience where you can:
 - **Multiple themes**: Light, Sepia, Dark modes
 - **Adjustable font size** for comfortable reading
 - **Keyboard shortcuts**: Space to play/pause, arrows to navigate
+- **View original pages**: Side-by-side view of PDF pages
 
 ## Requirements
 
-**CRITICAL: Python 3.12.x is required** (Kokoro TTS does not support Python 3.13+)
-
-- Python 3.12.x (NOT 3.13)
+- Python 3.10-3.13
 - FFmpeg
 - Docker Desktop (for Audiobookshelf)
-- ~4GB RAM for TTS processing
-- GPU recommended but not required
+- ~8GB RAM for TTS processing
+- **GPU highly recommended** (NVIDIA with CUDA)
 
 ## Quick Start (Windows)
 
 ```powershell
-# 1. Run the setup script (handles Python 3.12, venv, dependencies)
-.\setup.ps1
+# 1. Install Tortoise TTS and dependencies
+.\install_tortoise.ps1
 
-# 2. Activate virtual environment
-.\venv\Scripts\Activate.ps1
-
-# 3. Verify installation
+# 2. Verify installation
 python -m scripts.main info
 
-# 4. Convert a PDF to audiobook
-python -m scripts.main convert "input\My Book.pdf"
+# 3. Test voice generation (quick test)
+python -m scripts.main test-voice --preset ultra_fast
+
+# 4. Convert a book to audiobook
+python -m scripts.main convert "input\The_Intelligent_Investor_Clean.docx"
 
 # 5. Start Audiobookshelf
 cd docker && docker-compose up -d
@@ -54,15 +54,23 @@ cd docker && docker-compose up -d
 
 Or manually:
 ```powershell
-# Create virtual environment with Python 3.12
-py -3.12 -m venv venv
-.\venv\Scripts\Activate.ps1
+# Upgrade pip
+pip install --upgrade pip
 
-# Install dependencies
+# Install PyTorch with CUDA (if you have NVIDIA GPU)
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+# Or CPU-only:
+pip install torch torchvision torchaudio
+
+# Install compatible transformers (IMPORTANT: do this BEFORE tortoise-tts)
+pip install "tokenizers>=0.14.0" "transformers>=4.35.0"
+
+# Install other dependencies
 pip install -r requirements.txt
 
-# Download Kokoro TTS models (first run downloads ~300MB)
-python -c "from kokoro import KPipeline; KPipeline(lang_code='a')"
+# Install Tortoise TTS without conflicting dependencies
+pip install tortoise-tts --no-deps
 ```
 
 ## Project Structure
@@ -76,14 +84,15 @@ Audiobook-system/
 ├── docs/
 │   ├── SETUP.md               # Detailed setup guide
 │   └── TAILSCALE.md           # Remote access guide
-├── input/                     # Place PDFs/text files here
+├── input/                     # Place PDFs/DOCX/text files here
 ├── output/                    # Generated audiobooks
 │   └── readalong/             # Read-Along processed books
+├── voices/                    # Custom voice samples for cloning
 ├── scripts/
 │   ├── main.py                # CLI entry point
 │   ├── extract_text.py        # PDF text extraction
 │   ├── clean_text.py          # Text cleaning/normalization
-│   ├── generate_audio.py      # TTS generation
+│   ├── generate_audio.py      # TTS generation (Tortoise)
 │   ├── create_audiobook.py    # M4B creation
 │   ├── metadata.py            # Metadata/cover handling
 │   └── readalong/             # Read-Along module
@@ -92,37 +101,52 @@ Audiobook-system/
 │       ├── timing_map.py          # Timing JSON generation
 │       └── book_processor.py      # Complete pipeline
 ├── web/                       # Read-Along web reader
-│   ├── index.html             # Main reader page
+│   ├── reader.html            # Main reader page
+│   ├── library.html           # Book library
 │   ├── styles.css             # Reader styles
 │   └── reader.js              # Sync logic
+├── install_tortoise.ps1       # Windows installation script
+├── install_tortoise.sh        # Linux/Mac installation script
 ├── requirements.txt
 └── README.md
 ```
 
 ## Usage
 
-### Convert PDF to Audiobook
+### Convert PDF/DOCX to Audiobook
 
 ```bash
 # Basic conversion
 python -m scripts.main convert "input/book.pdf"
 
+# With quality preset
+python -m scripts.main convert "input/book.pdf" --preset standard
+
 # With custom options
 python -m scripts.main convert "input/book.pdf" \
-    --voice am_michael \
+    --voice train_dotrice \
+    --preset high_quality \
     --title "My Book Title" \
-    --author "Author Name" \
-    --cover "cover.jpg"
+    --author "Author Name"
 ```
+
+### Quality Presets
+
+| Preset | Speed | Quality | Use Case |
+|--------|-------|---------|----------|
+| `ultra_fast` | Fastest | Lower | Testing/preview |
+| `fast` | Moderate | Good | Development |
+| `standard` | Slow | High | Production |
+| `high_quality` | Slowest | Best | Final audiobooks |
 
 ### Available Commands
 
 ```bash
 # Convert PDF/text to M4B audiobook
-python -m scripts.main convert <file>
+python -m scripts.main convert <file> [--preset fast]
 
 # Create Read-Along book (synchronized audio-text)
-python -m scripts.main readalong <file>
+python -m scripts.main readalong <file> [--preset fast]
 
 # Extract text from PDF (for manual editing)
 python -m scripts.main extract <pdf>
@@ -134,7 +158,7 @@ python -m scripts.main clean <text_file>
 python -m scripts.main chapters <text_file>
 
 # Test a voice
-python -m scripts.main test-voice --voice af_sky
+python -m scripts.main test-voice --voice train_dotrice --preset ultra_fast
 
 # List available voices
 python -m scripts.main list-voices
@@ -147,7 +171,7 @@ python -m scripts.main info
 
 ```bash
 # 1. Process a book for Read-Along
-python -m scripts.main readalong "input/The Intelligent Investor.pdf"
+python -m scripts.main readalong "input/The_Intelligent_Investor_Clean.docx" --preset fast
 
 # 2. Start a local web server
 python -m http.server 8000 --directory web
@@ -159,26 +183,41 @@ python -m http.server 8000 --directory web
 # 5. Read along with synchronized audio-text highlighting!
 ```
 
-### Available Voices
+### Voice Cloning
 
-**Female (calm, recommended for audiobooks):**
-- `af_sky` - Calm, neutral (default)
-- `af_bella` - Warm, expressive
-- `af_nicole` - Professional
-- `af_sarah` - Friendly
+Clone any voice by providing reference audio samples:
 
-**Male (calm, recommended for audiobooks):**
-- `am_michael` - Calm, neutral
-- `am_adam` - Deep, authoritative
-- `am_fenrir` - Casual
+```bash
+# 1. Create a voice folder
+mkdir voices\my_narrator
 
-## Workflow
+# 2. Add 3-10 WAV files (6-10 seconds each) of clear speech
+# Place them in voices\my_narrator\
 
-1. **Prepare PDF**: Manually clean the PDF text (remove TOC, index, headers) - ~5 min
-2. **Convert**: Run the conversion script
-3. **Library**: Audiobookshelf automatically picks up new audiobooks
-4. **Listen**: Use mobile app (Plappa/ABS) to listen
-5. **Sync**: Progress syncs across devices
+# 3. Use your cloned voice
+python -m scripts.main convert "input/book.pdf" --voice my_narrator
+```
+
+### Built-in Voices
+
+**Recommended for Audiobooks:**
+- `train_dotrice` - British, narrator-style (default)
+- `train_kennard` - Male, warm and clear
+- `train_grace` - Female, elegant
+
+**Male Voices:**
+- `freeman` - Deep, authoritative
+- `deniro` - Casual, conversational
+- `tom` - Clear, neutral
+- `william` - British, refined
+- `geralt` - Deep, dramatic
+
+**Female Voices:**
+- `emma` - British, warm
+- `halle` - American, professional
+- `jlaw` - American, casual
+- `angie` - Expressive
+- `mol` - Clear, neutral
 
 ## Configuration
 
@@ -186,21 +225,53 @@ Edit `config/settings.yaml` to customize:
 
 ```yaml
 voice:
-  default: "af_sky"  # Change default voice
-  speed: 0.95        # Adjust speech rate
+  default: "train_dotrice"  # Default voice
+  speed: 1.0                # Speech rate
+  preset: "fast"            # Quality preset
 
 chapters:
-  pause_between: 1.5 # Seconds between chapters
+  pause_between: 1.5        # Seconds between chapters
 
 audio:
   m4b:
-    bitrate: "64k"   # Audio quality
+    bitrate: "64k"          # Audio quality
 ```
 
 ## Documentation
 
 - [Detailed Setup Guide](docs/SETUP.md)
 - [Tailscale Remote Access](docs/TAILSCALE.md)
+
+## Troubleshooting
+
+### Tortoise TTS Installation Issues
+
+If you get errors about `tokenizers` or `Rust compiler`:
+
+```powershell
+# Make sure to install transformers FIRST with newer versions
+pip install "tokenizers>=0.14.0" "transformers>=4.35.0"
+
+# Then install tortoise-tts without dependencies
+pip install tortoise-tts --no-deps
+```
+
+### Out of Memory (OOM) Errors
+
+Tortoise TTS requires significant VRAM. If you get OOM errors:
+
+1. Use `--preset ultra_fast` for testing
+2. Process shorter chapters
+3. Use CPU mode (slower but works): set `CUDA_VISIBLE_DEVICES=""`
+
+### Slow Generation
+
+Tortoise TTS is slower than other TTS systems but produces higher quality:
+
+- Use GPU (10-20x faster than CPU)
+- Use `ultra_fast` preset for quick tests
+- Use `fast` preset for good balance
+- Reserve `high_quality` for final production
 
 ## License
 
