@@ -41,8 +41,9 @@ if ($cudaAvailable) {
 }
 
 # Step 3: Install compatible transformers and tokenizers FIRST
+# NOTE: Tortoise requires transformers <4.40.0 (model_parallel_utils was removed in newer versions)
 Write-Host "`n[3/6] Installing transformers with compatible tokenizers..." -ForegroundColor Green
-python -m pip install "tokenizers>=0.14.0" "transformers>=4.35.0"
+python -m pip install "tokenizers>=0.14.0,<0.20.0" "transformers>=4.35.0,<4.40.0"
 
 # Step 4: Install other Tortoise dependencies
 Write-Host "`n[4/6] Installing Tortoise TTS dependencies..." -ForegroundColor Green
