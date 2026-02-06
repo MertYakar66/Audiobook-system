@@ -203,9 +203,17 @@ class TimedTortoiseTTSGenerator:
 
         return output_path, timed_segments
 
+    # Maximum characters per TTS call to prevent OOM errors
+    MAX_CHARS_PER_CHUNK = 200
+
     def _generate_sentence_audio(self, text: str, tts) -> np.ndarray:
-        """Generate audio for a single sentence."""
+        """Generate audio for a single sentence with chunking for long text."""
         import torch
+        import gc
+
+        # Split very long sentences into chunks to prevent OOM
+        if len(text) > self.MAX_CHARS_PER_CHUNK:
+            return self._generate_chunked_audio(text, tts)
 
         # Generate with Tortoise
         audio = tts.tts_with_preset(
@@ -219,7 +227,106 @@ class TimedTortoiseTTSGenerator:
         if torch.is_tensor(audio):
             audio = audio.squeeze().cpu().numpy()
 
+        # Clean up GPU memory after each sentence
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        gc.collect()
+
         return audio.astype(np.float32)
+
+    def _generate_chunked_audio(self, text: str, tts) -> np.ndarray:
+        """Split long text into chunks and generate audio for each."""
+        import torch
+        import gc
+
+        # Split on punctuation or at max length
+        chunks = self._split_text_into_chunks(text)
+        audio_parts = []
+
+        for chunk in chunks:
+            if not chunk.strip():
+                continue
+
+            audio = tts.tts_with_preset(
+                chunk,
+                voice_samples=self._voice_samples,
+                conditioning_latents=self._conditioning_latents,
+                preset=self.preset,
+            )
+
+            if torch.is_tensor(audio):
+                audio = audio.squeeze().cpu().numpy()
+
+            audio_parts.append(audio.astype(np.float32))
+
+            # Clean up memory after each chunk
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            gc.collect()
+
+        if not audio_parts:
+            return np.zeros(int(0.5 * self.SAMPLE_RATE), dtype=np.float32)
+
+        # Add small pause between chunks
+        pause = np.zeros(int(0.1 * self.SAMPLE_RATE), dtype=np.float32)
+        result = []
+        for i, part in enumerate(audio_parts):
+            result.append(part)
+            if i < len(audio_parts) - 1:
+                result.append(pause)
+
+        return np.concatenate(result)
+
+    def _split_text_into_chunks(self, text: str) -> list:
+        """Split text into smaller chunks at natural break points."""
+        import re
+
+        # First try to split on sentence-ending punctuation
+        chunks = []
+        current = ""
+
+        # Split on commas, semicolons, colons, or natural phrase breaks
+        parts = re.split(r'([,;:\-\u2014])\s*', text)
+
+        for i, part in enumerate(parts):
+            if not part:
+                continue
+
+            # If it's a delimiter, add it to current
+            if re.match(r'^[,;:\-\u2014]$', part):
+                current += part
+                continue
+
+            if len(current) + len(part) <= self.MAX_CHARS_PER_CHUNK:
+                current += " " + part if current else part
+            else:
+                if current:
+                    chunks.append(current.strip())
+                current = part
+
+        if current:
+            chunks.append(current.strip())
+
+        # If we still have chunks that are too long, force-split them
+        final_chunks = []
+        for chunk in chunks:
+            if len(chunk) <= self.MAX_CHARS_PER_CHUNK:
+                final_chunks.append(chunk)
+            else:
+                # Force split at word boundaries
+                words = chunk.split()
+                current = ""
+                for word in words:
+                    if len(current) + len(word) + 1 <= self.MAX_CHARS_PER_CHUNK:
+                        current += " " + word if current else word
+                    else:
+                        if current:
+                            final_chunks.append(current)
+                        current = word
+                if current:
+                    final_chunks.append(current)
+
+        return final_chunks
 
     def _normalize(self, audio: np.ndarray) -> np.ndarray:
         """Normalize audio to target dB level."""

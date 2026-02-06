@@ -8,7 +8,6 @@ Now uses Tortoise TTS for high-quality, natural speech with voice cloning.
 
 Features:
 - Resume interrupted processing from last completed chapter
-- Extract original document pages (images) for viewing
 - Progress state persistence
 - Memory-optimized batch processing
 - GPU acceleration support
@@ -62,7 +61,6 @@ class ProcessedBook:
     output_dir: Path
     total_duration: float
     source_file: Optional[Path] = None
-    has_pages: bool = False
 
 
 @dataclass
@@ -140,13 +138,11 @@ class BookProcessor:
     2. Clean and prepare text
     3. Split into chapters and sentences
     4. Generate timed audio for each sentence
-    5. Extract document pages as images (for PDF/DOCX)
-    6. Create timing maps
-    7. Package for web reader
+    5. Create timing maps
+    6. Package for web reader
 
     Enhanced features:
     - Resume from interrupted processing
-    - Extract original pages for dual-view reading
     - Progress persistence
     - Memory optimization
     """
@@ -188,7 +184,6 @@ class BookProcessor:
         author: Optional[str] = None,
         skip_chapters: Optional[List[int]] = None,
         resume: bool = True,
-        extract_pages: bool = True,
     ) -> ProcessedBook:
         """
         Process a complete book for Read-Along.
@@ -200,7 +195,6 @@ class BookProcessor:
             author: Override author name
             skip_chapters: Chapter numbers to skip
             resume: Resume from previous progress if available
-            extract_pages: Extract original document pages as images
 
         Returns:
             ProcessedBook with all data and paths
@@ -272,20 +266,8 @@ class BookProcessor:
             )
             state.save(state_path)
 
-        # Step 5: Extract document pages (if PDF/DOCX)
-        has_pages = False
-        if extract_pages and input_path.suffix.lower() in [".pdf", ".docx"]:
-            logger.step("Extracting document pages", 5, 7)
-            has_pages = self._extract_pages(input_path, output_dir)
-            if has_pages:
-                logger.info("Document pages extracted for viewing")
-            else:
-                logger.info("Could not extract pages (text-only mode)")
-        else:
-            logger.step("Skipping page extraction (text file)", 5, 7)
-
-        # Step 6: Process each chapter
-        logger.step("Generating audio with timing", 6, 7)
+        # Step 5: Process each chapter
+        logger.step("Generating audio with timing", 5, 6)
         processed_chapters = []
         timing_builder = TimingMap(
             book_id=book_id,
@@ -392,8 +374,8 @@ class BookProcessor:
         # Build timing map
         timing_map = timing_builder.build()
 
-        # Step 7: Package output
-        logger.step("Packaging output", 7, 7)
+        # Step 6: Package output
+        logger.step("Packaging output", 6, 6)
 
         # Save timing map
         timing_path = output_dir / "timing.json"
@@ -412,7 +394,6 @@ class BookProcessor:
             cover_path=cover_path,
             output_dir=output_dir,
             source_file=input_path,
-            has_pages=has_pages,
         )
         manifest_path = output_dir / "manifest.json"
         with open(manifest_path, "w", encoding="utf-8") as f:
@@ -451,7 +432,6 @@ class BookProcessor:
             output_dir=output_dir,
             total_duration=total_duration,
             source_file=input_path,
-            has_pages=has_pages,
         )
 
     def _extract_text(self, path: Path) -> str:
@@ -475,135 +455,6 @@ class BookProcessor:
 
         else:
             raise ValueError(f"Unsupported file type: {suffix}")
-
-    def _extract_pages(self, path: Path, output_dir: Path) -> bool:
-        """
-        Extract document pages as images for viewing.
-
-        Args:
-            path: Source document path
-            output_dir: Output directory
-
-        Returns:
-            True if pages were extracted successfully
-        """
-        pages_dir = output_dir / "pages"
-        pages_dir.mkdir(exist_ok=True)
-
-        suffix = path.suffix.lower()
-
-        if suffix == ".pdf":
-            return self._extract_pdf_pages(path, pages_dir)
-        elif suffix == ".docx":
-            return self._extract_docx_pages(path, pages_dir)
-
-        return False
-
-    def _extract_pdf_pages(self, pdf_path: Path, pages_dir: Path) -> bool:
-        """Extract PDF pages as images."""
-        try:
-            import fitz  # PyMuPDF
-
-            doc = fitz.open(str(pdf_path))
-            page_count = len(doc)
-
-            logger.info(f"Extracting {page_count} PDF pages...")
-
-            # Create page index
-            page_index = []
-
-            for page_num in range(page_count):
-                page = doc[page_num]
-
-                # Render at 150 DPI for good quality without huge files
-                mat = fitz.Matrix(150 / 72, 150 / 72)
-                pix = page.get_pixmap(matrix=mat)
-
-                # Save as JPEG for smaller size
-                img_path = pages_dir / f"page_{page_num + 1:04d}.jpg"
-                pix.save(str(img_path))
-
-                page_index.append({
-                    "page": page_num + 1,
-                    "file": f"pages/{img_path.name}",
-                    "width": pix.width,
-                    "height": pix.height,
-                })
-
-                # Progress every 10 pages
-                if (page_num + 1) % 10 == 0:
-                    logger.info(f"  Page {page_num + 1}/{page_count}")
-
-            doc.close()
-
-            # Save page index
-            index_path = pages_dir.parent / "pages.json"
-            with open(index_path, "w", encoding="utf-8") as f:
-                json.dump({
-                    "total_pages": page_count,
-                    "format": "pdf",
-                    "pages": page_index,
-                }, f, indent=2)
-
-            return True
-
-        except ImportError:
-            logger.warning("PyMuPDF not available for page extraction")
-            return False
-        except Exception as e:
-            logger.warning(f"Failed to extract PDF pages: {e}")
-            return False
-
-    def _extract_docx_pages(self, docx_path: Path, pages_dir: Path) -> bool:
-        """Extract DOCX embedded images."""
-        try:
-            import docx
-            from docx.shared import Inches
-
-            doc = docx.Document(docx_path)
-            images = []
-            img_count = 0
-
-            # Extract all images from the document
-            for rel in doc.part.rels.values():
-                if "image" in rel.reltype:
-                    img_count += 1
-                    img_data = rel.target_part.blob
-                    ext = rel.target_part.content_type.split("/")[-1]
-                    if ext == "jpeg":
-                        ext = "jpg"
-
-                    img_path = pages_dir / f"image_{img_count:04d}.{ext}"
-                    with open(img_path, "wb") as f:
-                        f.write(img_data)
-
-                    images.append({
-                        "index": img_count,
-                        "file": f"pages/{img_path.name}",
-                    })
-
-            if images:
-                logger.info(f"Extracted {len(images)} images from DOCX")
-
-                # Save image index
-                index_path = pages_dir.parent / "pages.json"
-                with open(index_path, "w", encoding="utf-8") as f:
-                    json.dump({
-                        "total_images": len(images),
-                        "format": "docx",
-                        "images": images,
-                    }, f, indent=2)
-
-                return True
-
-            return False
-
-        except ImportError:
-            logger.warning("python-docx not available for image extraction")
-            return False
-        except Exception as e:
-            logger.warning(f"Failed to extract DOCX images: {e}")
-            return False
 
     def _get_metadata(self, path: Path, text: str) -> Dict[str, str]:
         """Extract metadata from source."""
@@ -679,7 +530,6 @@ class BookProcessor:
         cover_path: Optional[Path],
         output_dir: Path,
         source_file: Optional[Path] = None,
-        has_pages: bool = False,
     ) -> Dict[str, Any]:
         """Create book manifest for web reader."""
         manifest = {
@@ -709,11 +559,6 @@ class BookProcessor:
                 "timestamp": datetime.now().isoformat(),
             },
         }
-
-        # Add page viewing info if available
-        if has_pages:
-            manifest["pages"] = "pages.json"
-            manifest["hasOriginalPages"] = True
 
         # Add source file info
         if source_file:

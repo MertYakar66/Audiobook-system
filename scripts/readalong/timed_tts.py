@@ -4,28 +4,38 @@ Timed TTS Generator
 Generates audio with precise timing information for each sentence.
 Captures start/end timestamps for Read-Along synchronization.
 
-Uses Tortoise TTS for high-quality, natural speech.
-Falls back to pyttsx3 (system TTS) if Tortoise is not available.
+Uses Tortoise TTS for high-quality, natural speech (requires GPU).
+Falls back to pyttsx3 (system TTS) if Tortoise is not available or GPU unavailable.
 """
 
+import os
 import warnings
 
 # Track which TTS engine is being used
 _tts_engine = None
 _tts_error = None
 
-# Check if torch is available (required for Tortoise TTS)
+# Check if CUDA is explicitly disabled (CPU mode requested)
+_cuda_disabled = os.environ.get("CUDA_VISIBLE_DEVICES", "") in ["-1", ""]
+_force_cpu = os.environ.get("FORCE_CPU_TTS", "").lower() in ["1", "true", "yes"]
+
+# Check if torch and CUDA are available
 _torch_available = False
+_cuda_available = False
 try:
     import torch
     _torch_available = True
+    _cuda_available = torch.cuda.is_available() and not _cuda_disabled
 except ImportError:
     pass
 
-# Try to import Tortoise TTS first (only if torch is available)
+# Use pyttsx3 for CPU mode (Tortoise on CPU is too slow and can crash)
+# Only use Tortoise if GPU is available
 try:
     if not _torch_available:
         raise ImportError("torch not available")
+    if not _cuda_available or _force_cpu:
+        raise ImportError("GPU not available - using pyttsx3 for CPU mode")
     from scripts.readalong.timed_tts_tortoise import (
         TimedTortoiseTTSGenerator as TimedTTSGenerator,
         TimedSegment,
