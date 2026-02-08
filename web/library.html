@@ -4,85 +4,274 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#007bff">
-    <meta name="description" content="Read-Along: Your personal audiobook library with synchronized text">
+    <meta name="theme-color" content="#0d1117">
+    <meta name="description" content="Scriptum - Your personal audiobook library with synchronized text and notes">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="manifest.json">
-    <title>Read-Along Library</title>
+    <title>Scriptum</title>
     <link rel="stylesheet" href="library.css">
 </head>
 
 <body>
     <div id="app">
-        <!-- Header -->
-        <header class="header">
-            <div class="header-content">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
                 <div class="logo">
-                    <span class="logo-icon">📖</span>
-                    <h1>Read-Along</h1>
-                </div>
-                <nav class="nav-tabs">
-                    <button class="nav-tab active" data-tab="library">Library</button>
-                    <button class="nav-tab" data-tab="continue">Continue Reading</button>
-                </nav>
-                <button id="settings-btn" class="icon-btn" title="Settings">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="3" />
-                        <path
-                            d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+                    <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="28" height="28">
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                        <line x1="8" y1="7" x2="16" y2="7" />
+                        <line x1="8" y1="11" x2="14" y2="11" />
                     </svg>
+                    <span class="logo-text">Scriptum</span>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <!-- Books Section -->
+                <div class="nav-section" data-section="books">
+                    <button class="nav-section-toggle" data-target="books">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+                        </svg>
+                        <span>Books</span>
+                        <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                    </button>
+                    <div class="nav-section-content" id="books-dropdown">
+                        <button class="nav-sub-item active" data-view="converted">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                                <polyline points="22 4 12 14.01 9 11.01" />
+                            </svg>
+                            <span>Converted</span>
+                            <span class="count" id="converted-count">0</span>
+                        </button>
+                        <button class="nav-sub-item" data-view="uploaded">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                <polyline points="17 8 12 3 7 8" />
+                                <line x1="12" y1="3" x2="12" y2="15" />
+                            </svg>
+                            <span>Uploaded</span>
+                            <span class="count" id="uploaded-count">0</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Notes Section -->
+                <div class="nav-section" data-section="notes">
+                    <button class="nav-section-toggle" data-target="notes">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                            <line x1="16" y1="13" x2="8" y2="13" />
+                            <line x1="16" y1="17" x2="8" y2="17" />
+                        </svg>
+                        <span>Notes</span>
+                        <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                    </button>
+                    <div class="nav-section-content" id="notes-dropdown">
+                        <button class="nav-sub-item" data-view="all-notes">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <rect x="3" y="3" width="18" height="18" rx="2" />
+                                <line x1="7" y1="8" x2="17" y2="8" />
+                                <line x1="7" y1="12" x2="17" y2="12" />
+                                <line x1="7" y1="16" x2="13" y2="16" />
+                            </svg>
+                            <span>All Highlights</span>
+                            <span class="count" id="notes-count">0</span>
+                        </button>
+                    </div>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button id="settings-btn" class="sidebar-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                        <circle cx="12" cy="12" r="3" />
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                    </svg>
+                    <span>Settings</span>
                 </button>
             </div>
-        </header>
+        </aside>
 
         <!-- Main Content -->
-        <main class="content">
-            <!-- Continue Reading Section -->
-            <section id="continue-section" class="section">
-                <h2>Continue Reading</h2>
-                <div id="continue-reading" class="continue-cards">
-                    <!-- Populated by JS -->
+        <main class="main-content">
+            <!-- Top Bar -->
+            <header class="top-bar">
+                <button id="sidebar-toggle" class="mobile-menu-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
+                        <line x1="3" y1="6" x2="21" y2="6" />
+                        <line x1="3" y1="12" x2="21" y2="12" />
+                        <line x1="3" y1="18" x2="21" y2="18" />
+                    </svg>
+                </button>
+                <h2 class="page-title" id="page-title">Library</h2>
+                <div class="top-bar-actions">
+                    <button id="search-btn" class="top-btn" title="Search">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                            <circle cx="11" cy="11" r="8" />
+                            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                        </svg>
+                    </button>
+                    <div class="view-toggles">
+                        <button class="view-toggle active" data-layout="grid" title="Grid view">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                                <rect x="3" y="3" width="7" height="7" />
+                                <rect x="14" y="3" width="7" height="7" />
+                                <rect x="3" y="14" width="7" height="7" />
+                                <rect x="14" y="14" width="7" height="7" />
+                            </svg>
+                        </button>
+                        <button class="view-toggle" data-layout="list" title="List view">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                                <line x1="8" y1="6" x2="21" y2="6" />
+                                <line x1="8" y1="12" x2="21" y2="12" />
+                                <line x1="8" y1="18" x2="21" y2="18" />
+                                <line x1="3" y1="6" x2="3.01" y2="6" />
+                                <line x1="3" y1="12" x2="3.01" y2="12" />
+                                <line x1="3" y1="18" x2="3.01" y2="18" />
+                            </svg>
+                        </button>
+                    </div>
                 </div>
-            </section>
+            </header>
 
-            <!-- Library Section -->
-            <section id="library-section" class="section">
-                <div class="section-header">
-                    <h2>Your Library</h2>
-                    <span id="book-count" class="book-count">0 books</span>
+            <!-- Content Area -->
+            <div class="content-area">
+                <!-- Search Bar (hidden by default) -->
+                <div id="search-bar" class="search-bar" style="display: none;">
+                    <input type="text" id="search-input" placeholder="Search books and notes..." autocomplete="off">
+                    <button id="search-close" class="search-close-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                    </button>
                 </div>
-                <div id="library-grid" class="library-grid">
-                    <!-- Books populated by JS -->
-                </div>
-            </section>
 
-            <!-- Empty State -->
-            <div id="empty-state" class="empty-state" style="display: none;">
-                <div class="empty-icon">📚</div>
-                <h2>No Books Yet</h2>
-                <p>Process a book with the Read-Along CLI to add it to your library.</p>
-                <pre class="command-hint">python -m scripts.main readalong "your-book.txt"</pre>
+                <!-- Converted Books View -->
+                <section id="view-converted" class="content-view active">
+                    <div class="content-header">
+                        <div class="content-header-info">
+                            <h3>Converted Books</h3>
+                            <span class="subtitle">Uploaded and ready to listen</span>
+                        </div>
+                        <div class="sort-control">
+                            <select id="sort-converted">
+                                <option value="added-desc">Added (newest)</option>
+                                <option value="added-asc">Added (oldest)</option>
+                                <option value="name-asc">Name (A-Z)</option>
+                                <option value="name-desc">Name (Z-A)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="converted-grid" class="books-grid">
+                        <!-- Populated by JS -->
+                    </div>
+                    <div id="converted-empty" class="empty-state" style="display: none;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" width="64" height="64">
+                            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+                        </svg>
+                        <h3>No Converted Books</h3>
+                        <p>Process a book with the CLI to add it here.</p>
+                        <code>python -m scripts.main readalong "your-book.pdf"</code>
+                    </div>
+                </section>
+
+                <!-- Uploaded Books View -->
+                <section id="view-uploaded" class="content-view">
+                    <div class="content-header">
+                        <div class="content-header-info">
+                            <h3>Uploaded Books</h3>
+                            <span class="subtitle">Waiting to be converted</span>
+                        </div>
+                    </div>
+                    <div id="uploaded-grid" class="books-grid">
+                        <!-- Populated by JS -->
+                    </div>
+                    <div id="uploaded-empty" class="empty-state" style="display: none;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" width="64" height="64">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="17 8 12 3 7 8" />
+                            <line x1="12" y1="3" x2="12" y2="15" />
+                        </svg>
+                        <h3>No Uploaded Books</h3>
+                        <p>Place PDF or DOCX files in the <code>input/</code> folder.</p>
+                    </div>
+                </section>
+
+                <!-- Notes/Highlights View -->
+                <section id="view-all-notes" class="content-view">
+                    <div class="content-header">
+                        <div class="content-header-info">
+                            <h3>Highlights & Notes</h3>
+                            <span class="subtitle">Your saved passages from all books</span>
+                        </div>
+                        <div class="notes-actions">
+                            <button id="export-all-notes" class="action-btn" title="Export all notes">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                    <polyline points="7 10 12 15 17 10" />
+                                    <line x1="12" y1="15" x2="12" y2="3" />
+                                </svg>
+                                <span>Export</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="notes-list" class="notes-list">
+                        <!-- Populated by JS -->
+                    </div>
+                    <div id="notes-empty" class="empty-state" style="display: none;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" width="64" height="64">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                            <line x1="16" y1="13" x2="8" y2="13" />
+                            <line x1="16" y1="17" x2="8" y2="17" />
+                        </svg>
+                        <h3>No Highlights Yet</h3>
+                        <p>Open a book and highlight text to see your notes here.</p>
+                    </div>
+                </section>
             </div>
         </main>
 
         <!-- Settings Panel -->
-        <div id="settings-panel" class="settings-panel">
-            <div class="settings-content">
-                <h2>Settings</h2>
+        <div id="settings-panel" class="settings-overlay">
+            <div class="settings-panel-content">
+                <div class="settings-header">
+                    <h2>Settings</h2>
+                    <button id="close-settings" class="close-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                    </button>
+                </div>
                 <div class="setting-group">
                     <label>Theme</label>
                     <div class="theme-options">
-                        <button data-theme="light" class="theme-btn active">Light</button>
+                        <button data-theme="dark" class="theme-btn active">Dark</button>
+                        <button data-theme="light" class="theme-btn">Light</button>
                         <button data-theme="sepia" class="theme-btn">Sepia</button>
-                        <button data-theme="dark" class="theme-btn">Dark</button>
                     </div>
                 </div>
-                <button id="close-settings" class="close-btn">Close</button>
             </div>
         </div>
 
-        <!-- Toast Notification -->
+        <!-- Mobile sidebar overlay -->
+        <div id="sidebar-overlay" class="sidebar-overlay"></div>
+
+        <!-- Toast -->
         <div id="toast" class="toast"></div>
     </div>
 

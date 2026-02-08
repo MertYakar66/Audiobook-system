@@ -1,11 +1,11 @@
 {
-    "name": "Read-Along Reader",
-    "short_name": "Read-Along",
-    "description": "Listen and read simultaneously with synchronized highlighting",
+    "name": "Scriptum",
+    "short_name": "Scriptum",
+    "description": "Your personal audiobook library with synchronized text and notes",
     "start_url": "/index.html",
     "display": "standalone",
-    "background_color": "#ffffff",
-    "theme_color": "#007bff",
+    "background_color": "#0a0a0a",
+    "theme_color": "#6c5ce7",
     "orientation": "any",
     "icons": [
         {
