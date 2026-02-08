@@ -45,6 +45,20 @@ python -m scripts.main readalong "input\The_Intelligent_Investor_TTScleaned.docx
 python -m scripts.readalong.timed_tts
 
 
+9. START THE WEB SERVER (to view the read-along website)
+--------------------------------------------------------------------------------
+python -m http.server 8000 --directory web
+
+Then open in browser: http://localhost:8000
+
+
+10. OPEN THE WEBSITE DIRECTLY (without server)
+--------------------------------------------------------------------------------
+start web\index.html
+
+Then click "Select Book Folder" and choose the output folder.
+
+
 ================================================================================
                            RECOMMENDED VOICES
 ================================================================================
