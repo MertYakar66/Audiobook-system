@@ -1,0 +1,58 @@
+================================================================================
+                    AUDIOBOOK SYSTEM - QUICK REFERENCE
+================================================================================
+
+1. UPDATE FROM GITHUB (run this first when starting)
+--------------------------------------------------------------------------------
+git pull origin claude/audiobook-generation-system-VT9bc
+
+
+2. INSTALL EDGE TTS (one-time setup)
+--------------------------------------------------------------------------------
+pip install edge-tts
+
+
+3. GENERATE AUDIOBOOK (default - uses Edge TTS)
+--------------------------------------------------------------------------------
+python -m scripts.main readalong "input\The_Intelligent_Investor_TTScleaned.docx"
+
+
+4. TEST A VOICE SAMPLE
+--------------------------------------------------------------------------------
+edge-tts --voice en-US-DavisNeural --text "Hello, this is a test." --write-media test.mp3
+start test.mp3
+
+
+5. LIST ALL AVAILABLE VOICES
+--------------------------------------------------------------------------------
+edge-tts --list-voices
+
+
+6. USE A SPECIFIC VOICE
+--------------------------------------------------------------------------------
+set EDGE_VOICE=en-US-GuyNeural
+python -m scripts.main readalong "input\The_Intelligent_Investor_TTScleaned.docx"
+
+
+7. FORCE USE TORTOISE TTS (slow, high quality)
+--------------------------------------------------------------------------------
+set TTS_ENGINE=tortoise
+python -m scripts.main readalong "input\The_Intelligent_Investor_TTScleaned.docx" --preset ultra_fast
+
+
+8. CHECK WHICH TTS ENGINE IS ACTIVE
+--------------------------------------------------------------------------------
+python -m scripts.readalong.timed_tts
+
+
+================================================================================
+                           RECOMMENDED VOICES
+================================================================================
+en-US-DavisNeural      - Male narrator (default, great for audiobooks)
+en-US-GuyNeural        - Male, friendly
+en-US-JennyNeural      - Female
+en-GB-RyanNeural       - British male
+en-GB-SoniaNeural      - British female
+en-AU-WilliamNeural    - Australian male
+
+================================================================================
