@@ -23,7 +23,7 @@ const READ_LISTEN_BOOKS = [
 // Read Only books — uploaded but not yet converted
 const READ_ONLY_BOOKS = [
     {
-        id: "the-intelligent-investor-read",
+        id: "the-intelligent-investor",
         title: "The Intelligent Investor",
         author: "Benjamin Graham",
         sourceFile: "../input/The Intelligent Investor.docx",
@@ -197,7 +197,7 @@ class ScriptumLibrary {
 
     renderBookGridCard(book, isConverted) {
         const percent = isConverted ? this.getProgressPercent(book) : 0;
-        const href = isConverted ? `reader.html?book=${book.id}` : (book.sourceFile || '#');
+        const href = isConverted ? `reader.html?book=${book.id}` : `reader-text.html?book=${book.id}`;
         const duration = isConverted && book.totalDuration ? this.formatDuration(book.totalDuration) : '';
         const cardId = `card-${book.id}`;
 
@@ -245,7 +245,7 @@ class ScriptumLibrary {
     }
 
     renderBookListItem(book, isConverted) {
-        const href = isConverted ? `reader.html?book=${book.id}` : (book.sourceFile || '#');
+        const href = isConverted ? `reader.html?book=${book.id}` : `reader-text.html?book=${book.id}`;
         const dateStr = book.addedDate ? this.formatDate(book.addedDate) : '';
 
         return `
