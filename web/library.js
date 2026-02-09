@@ -197,12 +197,12 @@ class ScriptumLibrary {
 
     renderBookGridCard(book, isConverted) {
         const percent = isConverted ? this.getProgressPercent(book) : 0;
-        const href = isConverted ? `reader.html?book=${book.id}` : '#';
+        const href = isConverted ? `reader.html?book=${book.id}` : (book.sourceFile || '#');
         const duration = isConverted && book.totalDuration ? this.formatDuration(book.totalDuration) : '';
         const cardId = `card-${book.id}`;
 
         return `
-            <a href="${href}" class="book-card" id="${cardId}" ${!isConverted ? 'onclick="event.preventDefault()"' : ''}>
+            <a href="${href}" class="book-card" id="${cardId}">
                 <div class="cover-container">
                     ${book.cover
                         ? `<img src="${book.cover}" alt="${this.escapeHtml(book.title)}" class="cover" data-fallback="true">`
@@ -245,11 +245,11 @@ class ScriptumLibrary {
     }
 
     renderBookListItem(book, isConverted) {
-        const href = isConverted ? `reader.html?book=${book.id}` : '#';
+        const href = isConverted ? `reader.html?book=${book.id}` : (book.sourceFile || '#');
         const dateStr = book.addedDate ? this.formatDate(book.addedDate) : '';
 
         return `
-            <a href="${href}" class="book-card" ${!isConverted ? 'onclick="event.preventDefault()"' : ''}>
+            <a href="${href}" class="book-card">
                 <div class="cover-container">
                     ${book.cover
                         ? `<img src="${book.cover}" alt="${this.escapeHtml(book.title)}" class="cover" data-fallback="true">`
