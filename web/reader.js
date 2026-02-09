@@ -977,9 +977,19 @@ class ReadAlongReader {
         const entry = chapter.entries.find(e => e.id === sentenceId);
 
         if (entry) {
-            this.audio.currentTime = entry.start;
-            if (!this.isPlaying) {
-                this.audio.play();
+            if (this.audio.readyState >= 1) {
+                // Audio metadata loaded, seek directly
+                this.audio.currentTime = entry.start;
+                if (!this.isPlaying) {
+                    this.audio.play();
+                }
+            } else {
+                // Audio not ready yet, wait for metadata then seek
+                this.audio.addEventListener('loadedmetadata', () => {
+                    this.audio.currentTime = entry.start;
+                    this.audio.play();
+                }, { once: true });
+                this.audio.load();
             }
         }
     }
