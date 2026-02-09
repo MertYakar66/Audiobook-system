@@ -197,22 +197,16 @@ class ScriptumLibrary {
 
     renderBookGridCard(book, isConverted) {
         const percent = isConverted ? this.getProgressPercent(book) : 0;
-        const coverError = `this.parentElement.innerHTML='<div class="cover-placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32" height="32"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div>'`;
-
         const href = isConverted ? `reader.html?book=${book.id}` : '#';
         const duration = isConverted && book.totalDuration ? this.formatDuration(book.totalDuration) : '';
+        const cardId = `card-${book.id}`;
 
         return `
-            <a href="${href}" class="book-card" ${!isConverted ? 'onclick="event.preventDefault()"' : ''}>
+            <a href="${href}" class="book-card" id="${cardId}" ${!isConverted ? 'onclick="event.preventDefault()"' : ''}>
                 <div class="cover-container">
                     ${book.cover
-                        ? `<img src="${book.cover}" alt="${this.escapeHtml(book.title)}" class="cover" onerror="${coverError}">`
-                        : `<div class="cover-placeholder">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32" height="32">
-                                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-                                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-                            </svg>
-                        </div>`
+                        ? `<img src="${book.cover}" alt="${this.escapeHtml(book.title)}" class="cover" data-fallback="true">`
+                        : this.coverPlaceholderSvg(32)
                     }
                     ${duration ? `<span class="duration-badge">${duration}</span>` : ''}
                     ${percent > 0 ? `
@@ -231,6 +225,15 @@ class ScriptumLibrary {
         `;
     }
 
+    coverPlaceholderSvg(size) {
+        return `<div class="cover-placeholder">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="${size}" height="${size}">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+            </svg>
+        </div>`;
+    }
+
     renderListHeader() {
         return `
             <div class="list-header">
@@ -243,20 +246,14 @@ class ScriptumLibrary {
 
     renderBookListItem(book, isConverted) {
         const href = isConverted ? `reader.html?book=${book.id}` : '#';
-        const coverError = `this.parentElement.innerHTML='<div class="cover-placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div>'`;
         const dateStr = book.addedDate ? this.formatDate(book.addedDate) : '';
 
         return `
             <a href="${href}" class="book-card" ${!isConverted ? 'onclick="event.preventDefault()"' : ''}>
                 <div class="cover-container">
                     ${book.cover
-                        ? `<img src="${book.cover}" alt="${this.escapeHtml(book.title)}" class="cover" onerror="${coverError}">`
-                        : `<div class="cover-placeholder">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20">
-                                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-                                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-                            </svg>
-                        </div>`
+                        ? `<img src="${book.cover}" alt="${this.escapeHtml(book.title)}" class="cover" data-fallback="true">`
+                        : this.coverPlaceholderSvg(20)
                     }
                 </div>
                 <div class="book-info">
@@ -342,6 +339,16 @@ class ScriptumLibrary {
     // ==================== EVENT BINDING ====================
 
     bindEvents() {
+        // Handle broken cover images globally
+        document.addEventListener('error', (e) => {
+            if (e.target.tagName === 'IMG' && e.target.dataset.fallback) {
+                const container = e.target.parentElement;
+                container.innerHTML = this.coverPlaceholderSvg(
+                    container.offsetWidth > 60 ? 32 : 20
+                );
+            }
+        }, true);
+
         // Sidebar section toggles
         document.querySelectorAll('.nav-section-toggle').forEach(toggle => {
             toggle.addEventListener('click', () => {
