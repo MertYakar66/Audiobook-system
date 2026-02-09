@@ -48,7 +48,7 @@
                                 <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
                                 <polyline points="22 4 12 14.01 9 11.01" />
                             </svg>
-                            <span>Converted</span>
+                            <span>Read & Listen</span>
                             <span class="count" id="converted-count">0</span>
                         </button>
                         <button class="nav-sub-item" data-view="uploaded">
@@ -57,7 +57,7 @@
                                 <polyline points="17 8 12 3 7 8" />
                                 <line x1="12" y1="3" x2="12" y2="15" />
                             </svg>
-                            <span>Uploaded</span>
+                            <span>Read Only</span>
                             <span class="count" id="uploaded-count">0</span>
                         </button>
                     </div>
@@ -162,8 +162,8 @@
                 <section id="view-converted" class="content-view active">
                     <div class="content-header">
                         <div class="content-header-info">
-                            <h3>Converted Books</h3>
-                            <span class="subtitle">Uploaded and ready to listen</span>
+                            <h3>Read & Listen</h3>
+                            <span class="subtitle">Books with audio - read and listen simultaneously</span>
                         </div>
                         <div class="sort-control">
                             <select id="sort-converted">
@@ -182,7 +182,7 @@
                             <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
                             <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
                         </svg>
-                        <h3>No Converted Books</h3>
+                        <h3>No Read & Listen Books</h3>
                         <p>Process a book with the CLI to add it here.</p>
                         <code>python -m scripts.main readalong "your-book.pdf"</code>
                     </div>
@@ -192,8 +192,8 @@
                 <section id="view-uploaded" class="content-view">
                     <div class="content-header">
                         <div class="content-header-info">
-                            <h3>Uploaded Books</h3>
-                            <span class="subtitle">Waiting to be converted</span>
+                            <h3>Read Only</h3>
+                            <span class="subtitle">Books available for reading (no audio)</span>
                         </div>
                     </div>
                     <div id="uploaded-grid" class="books-grid">
@@ -205,7 +205,7 @@
                             <polyline points="17 8 12 3 7 8" />
                             <line x1="12" y1="3" x2="12" y2="15" />
                         </svg>
-                        <h3>No Uploaded Books</h3>
+                        <h3>No Read Only Books</h3>
                         <p>Place PDF or DOCX files in the <code>input/</code> folder.</p>
                     </div>
                 </section>

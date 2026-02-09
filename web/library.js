@@ -5,36 +5,36 @@
  * and aggregated highlights/notes from all books.
  */
 
-// Converted books catalog — books that have been processed with readalong
-const CONVERTED_BOOKS = [
+// Read & Listen books — uploaded and converted (with TTS audio)
+const READ_LISTEN_BOOKS = [
     {
         id: "the-intelligent-investor",
         path: "../output/readalong/The-Intelligent-Investor",
         title: "The Intelligent Investor",
         author: "Benjamin Graham",
         cover: "../output/readalong/The-Intelligent-Investor/cover.jpg",
+        sourceFile: "../input/The Intelligent Investor.docx",
         totalDuration: 79196,
         chapterCount: 22,
         addedDate: "2025-02-05"
     }
 ];
 
-// Uploaded books (not yet converted) — detected from input folder
-const UPLOADED_BOOKS = [
-    // Example entry:
-    // {
-    //     id: "common-stocks",
-    //     title: "Common Stocks and Uncommon Profits",
-    //     author: "Philip Fisher",
-    //     filename: "Common-Stocks-and-Uncommon-Profits.pdf",
-    //     addedDate: "2025-02-05"
-    // }
+// Read Only books — uploaded but not yet converted
+const READ_ONLY_BOOKS = [
+    {
+        id: "the-intelligent-investor-read",
+        title: "The Intelligent Investor",
+        author: "Benjamin Graham",
+        sourceFile: "../input/The Intelligent Investor.docx",
+        addedDate: "2025-02-05"
+    }
 ];
 
 class ScriptumLibrary {
     constructor() {
-        this.convertedBooks = [];
-        this.uploadedBooks = [...UPLOADED_BOOKS];
+        this.readListenBooks = [];
+        this.readOnlyBooks = [...READ_ONLY_BOOKS];
         this.highlights = [];
         this.notes = [];
         this.currentView = 'converted';
@@ -45,7 +45,7 @@ class ScriptumLibrary {
 
     async init() {
         this.loadBookData();
-        await this.loadConvertedBooks();
+        await this.loadReadListenBooks();
         this.updateCounts();
         this.renderCurrentView();
         this.bindEvents();
@@ -57,13 +57,13 @@ class ScriptumLibrary {
 
     // ==================== DATA LOADING ====================
 
-    async loadConvertedBooks() {
-        for (const catalog of CONVERTED_BOOKS) {
+    async loadReadListenBooks() {
+        for (const catalog of READ_LISTEN_BOOKS) {
             try {
                 const response = await fetch(`${catalog.path}/manifest.json`);
                 if (response.ok) {
                     const manifest = await response.json();
-                    this.convertedBooks.push({
+                    this.readListenBooks.push({
                         ...catalog,
                         title: manifest.title || catalog.title,
                         author: manifest.author || catalog.author,
@@ -72,11 +72,11 @@ class ScriptumLibrary {
                         chapters: manifest.chapters || []
                     });
                 } else {
-                    this.convertedBooks.push(catalog);
+                    this.readListenBooks.push(catalog);
                 }
             } catch (e) {
                 console.warn(`Could not load manifest for ${catalog.id}`, e);
-                this.convertedBooks.push(catalog);
+                this.readListenBooks.push(catalog);
             }
         }
     }
@@ -113,8 +113,8 @@ class ScriptumLibrary {
     // ==================== RENDERING ====================
 
     updateCounts() {
-        document.getElementById('converted-count').textContent = this.convertedBooks.length;
-        document.getElementById('uploaded-count').textContent = this.uploadedBooks.length;
+        document.getElementById('converted-count').textContent = this.readListenBooks.length;
+        document.getElementById('uploaded-count').textContent = this.readOnlyBooks.length;
         document.getElementById('notes-count').textContent =
             this.highlights.length + this.notes.length;
     }
@@ -129,8 +129,8 @@ class ScriptumLibrary {
 
         // Update page title
         const titles = {
-            'converted': 'Library',
-            'uploaded': 'Uploaded Books',
+            'converted': 'Read & Listen',
+            'uploaded': 'Read Only',
             'all-notes': 'Highlights & Notes'
         };
         document.getElementById('page-title').textContent = titles[this.currentView] || 'Library';
@@ -153,7 +153,7 @@ class ScriptumLibrary {
         const grid = document.getElementById('converted-grid');
         const empty = document.getElementById('converted-empty');
 
-        if (this.convertedBooks.length === 0) {
+        if (this.readListenBooks.length === 0) {
             grid.style.display = 'none';
             empty.style.display = 'block';
             return;
@@ -165,10 +165,10 @@ class ScriptumLibrary {
         if (this.layout === 'list') {
             grid.className = 'books-grid list-layout';
             grid.innerHTML = this.renderListHeader() +
-                this.convertedBooks.map(book => this.renderBookListItem(book, true)).join('');
+                this.readListenBooks.map(book => this.renderBookListItem(book, true)).join('');
         } else {
             grid.className = 'books-grid';
-            grid.innerHTML = this.convertedBooks.map(book => this.renderBookGridCard(book, true)).join('');
+            grid.innerHTML = this.readListenBooks.map(book => this.renderBookGridCard(book, true)).join('');
         }
     }
 
@@ -176,7 +176,7 @@ class ScriptumLibrary {
         const grid = document.getElementById('uploaded-grid');
         const empty = document.getElementById('uploaded-empty');
 
-        if (this.uploadedBooks.length === 0) {
+        if (this.readOnlyBooks.length === 0) {
             grid.style.display = 'none';
             empty.style.display = 'block';
             return;
@@ -188,10 +188,10 @@ class ScriptumLibrary {
         if (this.layout === 'list') {
             grid.className = 'books-grid list-layout';
             grid.innerHTML = this.renderListHeader() +
-                this.uploadedBooks.map(book => this.renderBookListItem(book, false)).join('');
+                this.readOnlyBooks.map(book => this.renderBookListItem(book, false)).join('');
         } else {
             grid.className = 'books-grid';
-            grid.innerHTML = this.uploadedBooks.map(book => this.renderBookGridCard(book, false)).join('');
+            grid.innerHTML = this.readOnlyBooks.map(book => this.renderBookGridCard(book, false)).join('');
         }
     }
 
@@ -225,7 +225,7 @@ class ScriptumLibrary {
                     <div class="book-title">${this.escapeHtml(book.title)}</div>
                     ${book.author ? `<div class="book-author">${this.escapeHtml(book.author)}</div>` : ''}
                     ${isConverted && book.chapterCount ? `<div class="book-chapters">${book.chapterCount} chapters</div>` : ''}
-                    ${!isConverted ? '<div class="book-status pending">Pending conversion</div>' : ''}
+                    ${!isConverted ? '<div class="book-status pending">Read Only</div>' : ''}
                 </div>
             </a>
         `;
@@ -322,8 +322,8 @@ class ScriptumLibrary {
     }
 
     findBookById(bookId) {
-        return this.convertedBooks.find(b => b.id === bookId) ||
-               CONVERTED_BOOKS.find(b => b.id === bookId);
+        return this.readListenBooks.find(b => b.id === bookId) ||
+               READ_LISTEN_BOOKS.find(b => b.id === bookId);
     }
 
     getChapterTitle(book, chapterIndex) {
@@ -452,7 +452,7 @@ class ScriptumLibrary {
         }
 
         if (this.currentView === 'converted' || this.currentView === 'uploaded') {
-            const books = this.currentView === 'converted' ? this.convertedBooks : this.uploadedBooks;
+            const books = this.currentView === 'converted' ? this.readListenBooks : this.readOnlyBooks;
             const filtered = books.filter(b =>
                 b.title.toLowerCase().includes(query) ||
                 (b.author && b.author.toLowerCase().includes(query))
@@ -520,7 +520,7 @@ class ScriptumLibrary {
     sortBooks(sortKey) {
         const [field, direction] = sortKey.split('-');
 
-        this.convertedBooks.sort((a, b) => {
+        this.readListenBooks.sort((a, b) => {
             let valA, valB;
             if (field === 'name') {
                 valA = a.title.toLowerCase();
