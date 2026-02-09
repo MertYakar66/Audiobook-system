@@ -13,7 +13,7 @@ const READ_LISTEN_BOOKS = [
         title: "The Intelligent Investor",
         author: "Benjamin Graham",
         cover: "../output/readalong/The-Intelligent-Investor/cover.jpg",
-        sourceFile: "../input/The Intelligent Investor.docx",
+        sourceFile: "../input/DOCXs/The Intelligent Investor.docx",
         totalDuration: 79196,
         chapterCount: 22,
         addedDate: "2025-02-05"
@@ -26,7 +26,7 @@ const READ_ONLY_BOOKS = [
         id: "the-intelligent-investor",
         title: "The Intelligent Investor",
         author: "Benjamin Graham",
-        sourceFile: "../input/The Intelligent Investor.docx",
+        sourceFile: "../input/DOCXs/The Intelligent Investor.docx",
         addedDate: "2025-02-05"
     }
 ];
