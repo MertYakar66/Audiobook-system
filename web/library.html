@@ -9,6 +9,12 @@
     <meta name="mobile-web-app-capable" content="yes">
     <link rel="manifest" href="manifest.json">
     <title>Scriptum</title>
+    <style>
+        /* Critical CSS for instant render */
+        body { margin: 0; background: #121218; color: #e8e8f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+        #app { min-height: 100vh; }
+        .empty-state { display: flex; flex-direction: column; align-items: center; padding: 3rem; }
+    </style>
     <link rel="stylesheet" href="library.css">
 </head>
 
@@ -274,7 +280,7 @@
         <div id="toast" class="toast"></div>
     </div>
 
-    <script src="library.js"></script>
+    <script src="library.js" defer></script>
 </body>
 
 </html>

@@ -5,31 +5,9 @@
  * and aggregated highlights/notes from all books.
  */
 
-// Read & Listen books — uploaded and converted (with TTS audio)
-const READ_LISTEN_BOOKS = [
-    {
-        id: "the-intelligent-investor",
-        path: "../output/readalong/The-Intelligent-Investor",
-        title: "The Intelligent Investor",
-        author: "Benjamin Graham",
-        cover: "../output/readalong/The-Intelligent-Investor/cover.jpg",
-        sourceFile: "../input/DOCXs/The Intelligent Investor.docx",
-        totalDuration: 67953,
-        chapterCount: 41,
-        addedDate: "2025-02-05"
-    }
-];
-
-// Read Only books — uploaded but not yet converted
-const READ_ONLY_BOOKS = [
-    {
-        id: "the-intelligent-investor",
-        title: "The Intelligent Investor",
-        author: "Benjamin Graham",
-        sourceFile: "../input/DOCXs/The Intelligent Investor.docx",
-        addedDate: "2025-02-05"
-    }
-];
+// Books will be loaded from books.json
+const READ_LISTEN_BOOKS = [];
+const READ_ONLY_BOOKS = [];
 
 class ScriptumLibrary {
     constructor() {
@@ -58,26 +36,33 @@ class ScriptumLibrary {
     // ==================== DATA LOADING ====================
 
     async loadReadListenBooks() {
-        for (const catalog of READ_LISTEN_BOOKS) {
-            try {
-                const response = await fetch(`${catalog.path}/manifest.json`);
-                if (response.ok) {
-                    const manifest = await response.json();
-                    this.readListenBooks.push({
-                        ...catalog,
-                        title: manifest.title || catalog.title,
-                        author: manifest.author || catalog.author,
-                        totalDuration: manifest.totalDuration || catalog.totalDuration,
-                        chapterCount: manifest.chapterCount || catalog.chapterCount,
-                        chapters: manifest.chapters || []
-                    });
-                } else {
-                    this.readListenBooks.push(catalog);
-                }
-            } catch (e) {
-                console.warn(`Could not load manifest for ${catalog.id}`, e);
-                this.readListenBooks.push(catalog);
+        try {
+            // Load books from books.json with timeout
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+            const response = await fetch('../output/books.json', {
+                signal: controller.signal
+            });
+            clearTimeout(timeout);
+
+            if (response.ok) {
+                const books = await response.json();
+                this.readListenBooks = books.map(book => ({
+                    id: book.id,
+                    path: `../output/${book.path}`,
+                    title: book.title,
+                    author: book.author,
+                    cover: book.cover ? `../output/${book.cover}` : null,
+                    totalDuration: book.totalDuration || 0,
+                    chapterCount: book.chapterCount || 0,
+                    addedDate: new Date().toISOString().split('T')[0]
+                }));
             }
+        } catch (e) {
+            console.warn('Could not load books.json:', e);
+            // Fallback: empty library
+            this.readListenBooks = [];
         }
     }
 
