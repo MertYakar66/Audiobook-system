@@ -1,13 +1,13 @@
 [
   {
-    "id": "preface-to-the-fourth-edition-by-warren-e-buffett",
-    "title": "Preface to the Fourth Edition, by Warren E. Buffett",
-    "author": "Warren E. Buffett",
-    "cover": "readalong/preface-to-the-fourth-edition-by-warren-e-buffett/cover.jpg",
-    "path": "readalong/preface-to-the-fourth-edition-by-warren-e-buffett",
+    "id": "the-intelligent-investor",
+    "title": "The Intelligent Investor",
+    "author": "Benjamin Graham",
+    "cover": "readalong/the-intelligent-investor/cover.jpg",
+    "path": "readalong/the-intelligent-investor",
     "timing": "timing.json",
     "text": "text.json",
-    "totalDuration": 785.5,
-    "chapterCount": 3
+    "totalDuration": 0,
+    "chapterCount": 41
   }
 ]
