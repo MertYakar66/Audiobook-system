@@ -13,9 +13,9 @@ const READ_LISTEN_BOOKS = [
         title: "The Intelligent Investor",
         author: "Benjamin Graham",
         cover: "../output/readalong/The-Intelligent-Investor/cover.jpg",
-        sourceFile: "../input/The Intelligent Investor.docx",
-        totalDuration: 79196,
-        chapterCount: 22,
+        sourceFile: "../input/DOCXs/The Intelligent Investor.docx",
+        totalDuration: 67953,
+        chapterCount: 41,
         addedDate: "2025-02-05"
     }
 ];
@@ -23,10 +23,10 @@ const READ_LISTEN_BOOKS = [
 // Read Only books — uploaded but not yet converted
 const READ_ONLY_BOOKS = [
     {
-        id: "the-intelligent-investor-read",
+        id: "the-intelligent-investor",
         title: "The Intelligent Investor",
         author: "Benjamin Graham",
-        sourceFile: "../input/The Intelligent Investor.docx",
+        sourceFile: "../input/DOCXs/The Intelligent Investor.docx",
         addedDate: "2025-02-05"
     }
 ];
@@ -197,12 +197,12 @@ class ScriptumLibrary {
 
     renderBookGridCard(book, isConverted) {
         const percent = isConverted ? this.getProgressPercent(book) : 0;
-        const href = isConverted ? `reader.html?book=${book.id}` : '#';
+        const href = isConverted ? `reader.html?book=${book.id}` : `reader-text.html?book=${book.id}`;
         const duration = isConverted && book.totalDuration ? this.formatDuration(book.totalDuration) : '';
         const cardId = `card-${book.id}`;
 
         return `
-            <a href="${href}" class="book-card" id="${cardId}" ${!isConverted ? 'onclick="event.preventDefault()"' : ''}>
+            <a href="${href}" class="book-card" id="${cardId}">
                 <div class="cover-container">
                     ${book.cover
                         ? `<img src="${book.cover}" alt="${this.escapeHtml(book.title)}" class="cover" data-fallback="true">`
@@ -245,11 +245,11 @@ class ScriptumLibrary {
     }
 
     renderBookListItem(book, isConverted) {
-        const href = isConverted ? `reader.html?book=${book.id}` : '#';
+        const href = isConverted ? `reader.html?book=${book.id}` : `reader-text.html?book=${book.id}`;
         const dateStr = book.addedDate ? this.formatDate(book.addedDate) : '';
 
         return `
-            <a href="${href}" class="book-card" ${!isConverted ? 'onclick="event.preventDefault()"' : ''}>
+            <a href="${href}" class="book-card">
                 <div class="cover-container">
                     ${book.cover
                         ? `<img src="${book.cover}" alt="${this.escapeHtml(book.title)}" class="cover" data-fallback="true">`

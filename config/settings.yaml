@@ -9,7 +9,7 @@ voice:
   # Built-in: train_dotrice (narrator), train_kennard, emma, freeman, deniro, halle
   # Custom: Create folder voices/<name>/ with 3-10 WAV samples (6-10s each)
   # Recommended for audiobooks: train_dotrice (British, narrator-style)
-  default: "train_dotrice"
+  default: "en-US-GuyNeural"
 
   # Speech rate (affects pacing - 1.0 = normal)
   speed: 1.0

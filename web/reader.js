@@ -773,11 +773,21 @@ class ReadAlongReader {
 
         // Load audio
         const audioFileName = chapter.audioFile.split('/').pop();
+        // Prefer MP3 for faster loading, fall back to WAV
+        const mp3FileName = audioFileName.replace(/\.wav$/i, '.mp3');
 
         // Check if loading from URL (audioBasePath) or from folder (audioFiles)
         if (this.audioBasePath) {
-            // URL-based loading
-            this.audio.src = `${this.audioBasePath}/audio/${audioFileName}`;
+            // Try MP3 first, fall back to WAV
+            const mp3Url = `${this.audioBasePath}/audio/${mp3FileName}`;
+            const wavUrl = `${this.audioBasePath}/audio/${audioFileName}`;
+
+            this.audio.src = mp3Url;
+            this.audio.addEventListener('error', () => {
+                if (this.audio.src.endsWith('.mp3')) {
+                    this.audio.src = wavUrl;
+                }
+            }, { once: true });
 
             // Wait for audio to load then seek
             this.audio.addEventListener('loadedmetadata', () => {
@@ -977,9 +987,19 @@ class ReadAlongReader {
         const entry = chapter.entries.find(e => e.id === sentenceId);
 
         if (entry) {
-            this.audio.currentTime = entry.start;
-            if (!this.isPlaying) {
-                this.audio.play();
+            if (this.audio.readyState >= 1) {
+                // Audio metadata loaded, seek directly
+                this.audio.currentTime = entry.start;
+                if (!this.isPlaying) {
+                    this.audio.play();
+                }
+            } else {
+                // Audio not ready yet, wait for metadata then seek
+                this.audio.addEventListener('loadedmetadata', () => {
+                    this.audio.currentTime = entry.start;
+                    this.audio.play();
+                }, { once: true });
+                this.audio.load();
             }
         }
     }
@@ -1090,7 +1110,11 @@ class ReadAlongReader {
      * Set theme
      */
     setTheme(theme) {
-        document.body.dataset.theme = theme;
+        if (theme === 'dark') {
+            document.body.removeAttribute('data-theme');
+        } else {
+            document.body.dataset.theme = theme;
+        }
         document.querySelectorAll('.theme-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.theme === theme);
         });
@@ -1947,7 +1971,7 @@ class ReadAlongReader {
     saveSettings() {
         localStorage.setItem('readalong-settings', JSON.stringify({
             fontSize: this.fontSize,
-            theme: document.body.dataset.theme || 'light',
+            theme: document.body.dataset.theme || 'dark',
             speed: this.playbackSpeed,
             autoScroll: this.autoScroll,
             splitView: this.splitView,

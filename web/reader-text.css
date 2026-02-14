@@ -1,0 +1,276 @@
+/* Scriptum PDF Reader */
+
+:root {
+    --bg: #1a1a1a;
+    --bg-header: #111111;
+    --bg-controls: #111111;
+    --text: #e0e0e0;
+    --text-dim: #777777;
+    --border: #2a2a2a;
+    --accent: #6c5ce7;
+    --header-height: 48px;
+    --controls-height: 52px;
+    --page-gap: 12px;
+    --page-shadow: 0 2px 20px rgba(0, 0, 0, 0.5);
+}
+
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+    height: 100vh;
+}
+
+#app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+/* ==================== HEADER ==================== */
+
+.header {
+    height: var(--header-height);
+    background: var(--bg-header);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    flex-shrink: 0;
+    z-index: 10;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.header-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border: none;
+    background: none;
+    color: var(--text-dim);
+    border-radius: 8px;
+    cursor: pointer;
+    text-decoration: none;
+    flex-shrink: 0;
+    transition: all 0.15s;
+}
+
+.header-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text);
+}
+
+.header h1 {
+    font-size: 0.875rem;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text);
+}
+
+.page-indicator {
+    font-size: 0.8125rem;
+    color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    padding: 4px 10px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 6px;
+}
+
+/* ==================== VIEWER ==================== */
+
+.viewer {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.pages-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--page-gap);
+    padding: 20px 0 calc(var(--controls-height) + 20px);
+    width: 100%;
+}
+
+.page-wrapper {
+    box-shadow: var(--page-shadow);
+    background: #fff;
+    line-height: 0;
+}
+
+.page-wrapper canvas {
+    display: block;
+    max-width: 100%;
+    height: auto;
+}
+
+/* ==================== BOTTOM CONTROLS ==================== */
+
+.controls {
+    height: var(--controls-height);
+    background: var(--bg-controls);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 16px;
+    flex-shrink: 0;
+    z-index: 10;
+}
+
+.ctrl-btn {
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.15s;
+}
+
+.ctrl-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text);
+}
+
+.page-slider {
+    flex: 1;
+    height: 4px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+}
+
+.page-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    background: var(--accent);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform 0.15s;
+}
+
+.page-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.3);
+}
+
+.page-slider::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    background: var(--accent);
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+}
+
+/* ==================== STATES ==================== */
+
+.state-view {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    gap: 12px;
+    color: var(--text-dim);
+    padding: 40px;
+    text-align: center;
+}
+
+.state-view h2 {
+    color: var(--text);
+    font-size: 1.125rem;
+}
+
+.loader {
+    width: 28px;
+    height: 28px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.primary-btn {
+    padding: 10px 24px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    text-decoration: none;
+    margin-top: 8px;
+}
+
+/* ==================== TOAST ==================== */
+
+.toast {
+    position: fixed;
+    bottom: calc(var(--controls-height) + 16px);
+    left: 50%;
+    transform: translateX(-50%) translateY(60px);
+    background: var(--bg-header);
+    color: var(--text);
+    padding: 8px 18px;
+    border-radius: 8px;
+    font-size: 0.8125rem;
+    z-index: 300;
+    opacity: 0;
+    transition: all 0.25s ease;
+    border: 1px solid var(--border);
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* ==================== RESPONSIVE ==================== */
+
+@media (max-width: 600px) {
+    .page-wrapper canvas {
+        max-width: 100vw;
+    }
+
+    .pages-container {
+        padding: 8px 0 calc(var(--controls-height) + 8px);
+        gap: 8px;
+    }
+}

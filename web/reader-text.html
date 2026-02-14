@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0d1117">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Scriptum - Reader</title>
+    <link rel="stylesheet" href="reader-text.css">
+</head>
+
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <a href="library.html" class="header-btn" title="Back to Library">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                        <line x1="19" y1="12" x2="5" y2="12" />
+                        <polyline points="12 19 5 12 12 5" />
+                    </svg>
+                </a>
+                <h1 id="book-title">Loading...</h1>
+            </div>
+            <div class="header-right">
+                <span class="page-indicator" id="page-indicator">0 / 0</span>
+            </div>
+        </header>
+
+        <!-- PDF Viewer -->
+        <main class="viewer" id="viewer">
+            <!-- Loading State -->
+            <div id="loading-state" class="state-view">
+                <div class="loader"></div>
+                <p>Loading PDF...</p>
+            </div>
+
+            <!-- Error State -->
+            <div id="error-state" class="state-view" style="display: none;">
+                <h2>Could not load PDF</h2>
+                <p id="error-message"></p>
+                <a href="library.html" class="primary-btn">Back to Library</a>
+            </div>
+
+            <!-- Pages Container -->
+            <div id="pages-container" class="pages-container" style="display: none;">
+                <!-- Canvas pages rendered here by PDF.js -->
+            </div>
+        </main>
+
+        <!-- Bottom Controls -->
+        <footer class="controls" id="controls">
+            <button id="prev-page" class="ctrl-btn" title="Previous page">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                    <polyline points="15 18 9 12 15 6" />
+                </svg>
+            </button>
+            <input type="range" id="page-slider" class="page-slider" min="1" max="1" value="1">
+            <button id="next-page" class="ctrl-btn" title="Next page">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                    <polyline points="9 18 15 12 9 6" />
+                </svg>
+            </button>
+        </footer>
+
+        <!-- Toast -->
+        <div id="toast" class="toast"></div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs" type="module"></script>
+    <script src="reader-text.js" type="module"></script>
+</body>
+
+</html>
