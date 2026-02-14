@@ -1,24 +1,24 @@
-/* Read-Along Reader Styles - Enhanced with Phase 3-4 Features */
+/* Scriptum Reader - Premium Theme (matches Library) */
 
 /* CSS Variables for theming */
 :root {
-    /* Light theme (default) */
-    --bg-color: #ffffff;
-    --text-color: #1a1a1a;
-    --text-secondary: #666666;
-    --highlight-bg: #fff3cd;
-    --highlight-border: #ffc107;
-    --search-highlight: #bbdefb;
-    --note-highlight: #c8e6c9;
-    --header-bg: #f8f9fa;
-    --player-bg: #ffffff;
-    --border-color: #e0e0e0;
-    --button-bg: #007bff;
-    --button-hover: #0056b3;
-    --progress-bg: #e9ecef;
-    --progress-fill: #007bff;
-    --shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    --modal-bg: rgba(0, 0, 0, 0.5);
+    /* Dark theme (default - matches library) */
+    --bg-color: #121218;
+    --text-color: #e8e8f0;
+    --text-secondary: #9090a8;
+    --highlight-bg: #32325a;
+    --highlight-border: #6c5ce7;
+    --search-highlight: #1e3a5f;
+    --note-highlight: #2e4a3e;
+    --header-bg: #1a1a24;
+    --player-bg: #1a1a24;
+    --border-color: #2a2a3c;
+    --button-bg: #6c5ce7;
+    --button-hover: #5b4bd6;
+    --progress-bg: #2a2a3c;
+    --progress-fill: #6c5ce7;
+    --shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+    --modal-bg: rgba(0, 0, 0, 0.7);
 
     /* Sizing */
     --font-size: 18px;
@@ -26,6 +26,26 @@
     --max-width: 750px;
     --player-height: 120px;
     --header-height: 60px;
+}
+
+/* Light theme */
+[data-theme="light"] {
+    --bg-color: #f8f9fc;
+    --text-color: #1a1a2e;
+    --text-secondary: #5a5a72;
+    --highlight-bg: #fff3cd;
+    --highlight-border: #ffc107;
+    --search-highlight: #bbdefb;
+    --note-highlight: #c8e6c9;
+    --header-bg: #eef0f5;
+    --player-bg: #eef0f5;
+    --border-color: #d8dae5;
+    --button-bg: #6c5ce7;
+    --button-hover: #5b4bd6;
+    --progress-bg: #d8dae5;
+    --progress-fill: #6c5ce7;
+    --shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    --modal-bg: rgba(0, 0, 0, 0.5);
 }
 
 /* Sepia theme */
@@ -38,27 +58,14 @@
     --search-highlight: #ffe4b5;
     --note-highlight: #dcedc8;
     --header-bg: #efe4d0;
-    --player-bg: #f4ecd8;
+    --player-bg: #efe4d0;
     --border-color: #d4c5a9;
-}
-
-/* Dark theme */
-[data-theme="dark"] {
-    --bg-color: #1a1a2e;
-    --text-color: #eaeaea;
-    --text-secondary: #a0a0a0;
-    --highlight-bg: #3d3d5c;
-    --highlight-border: #6c5ce7;
-    --search-highlight: #1e3a5f;
-    --note-highlight: #2e4a3e;
-    --header-bg: #16162a;
-    --player-bg: #16162a;
-    --border-color: #2d2d4a;
     --button-bg: #6c5ce7;
-    --button-hover: #5649c9;
-    --progress-bg: #2d2d4a;
+    --button-hover: #5b4bd6;
+    --progress-bg: #d4c5a9;
     --progress-fill: #6c5ce7;
-    --modal-bg: rgba(0, 0, 0, 0.7);
+    --shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    --modal-bg: rgba(0, 0, 0, 0.5);
 }
 
 /* Reset */
