@@ -11,6 +11,7 @@ import os
 import sys
 import mimetypes
 from http.server import HTTPServer, SimpleHTTPRequestHandler
+from socketserver import ThreadingMixIn
 
 class RangeHTTPRequestHandler(SimpleHTTPRequestHandler):
     """HTTP handler that supports Range requests for audio seeking."""
@@ -72,10 +73,15 @@ class RangeHTTPRequestHandler(SimpleHTTPRequestHandler):
         super().end_headers()
 
 
+class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
+    """Handle requests in separate threads so audio downloads don't block page loads."""
+    daemon_threads = True
+
+
 if __name__ == '__main__':
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
-    server = HTTPServer(('0.0.0.0', port), RangeHTTPRequestHandler)
-    print(f'Serving on http://localhost:{port} (with Range request support)')
+    server = ThreadedHTTPServer(('0.0.0.0', port), RangeHTTPRequestHandler)
+    print(f'Serving on http://localhost:{port} (multi-threaded, with Range request support)')
     print('Press Ctrl+C to stop')
     try:
         server.serve_forever()

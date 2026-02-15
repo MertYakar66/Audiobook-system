@@ -302,6 +302,8 @@ body {
 
 .paragraph {
     margin-bottom: 1.5em;
+    content-visibility: auto;
+    contain-intrinsic-size: auto 80px;
 }
 
 .sentence {
@@ -309,7 +311,7 @@ body {
     padding: 2px 4px;
     margin: 0 -4px;
     border-radius: 4px;
-    transition: all 0.2s ease;
+    transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
     border: 2px solid transparent;
 }
 

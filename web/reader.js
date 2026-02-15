@@ -450,7 +450,9 @@ class ReadAlongReader {
             this.audio.currentTime = Math.max(0, this.audio.currentTime - 10);
         });
         document.getElementById('skip-forward').addEventListener('click', () => {
-            this.audio.currentTime = Math.min(this.audio.duration, this.audio.currentTime + 30);
+            const duration = this.audio.duration;
+            const newTime = this.audio.currentTime + 30;
+            this.audio.currentTime = (duration && isFinite(duration)) ? Math.min(duration, newTime) : newTime;
         });
 
         // Progress bar
@@ -781,7 +783,7 @@ class ReadAlongReader {
             const mp3Url = `${this.audioBasePath}/audio/${mp3FileName}`;
             const wavUrl = `${this.audioBasePath}/audio/${audioFileName}`;
 
-            this.audio.preload = 'auto';
+            this.audio.preload = 'metadata';
             this.audio.src = mp3Url;
             this.audio.addEventListener('error', () => {
                 if (this.audio.src.endsWith('.mp3')) {
@@ -1020,11 +1022,17 @@ class ReadAlongReader {
 
         const doSeek = () => {
             const duration = this.audio.duration;
-            if (duration && isFinite(duration) && !chapter._timingsDuration) {
+            if (!duration || !isFinite(duration)) {
+                // Duration not available yet - can't compute position, wait for metadata
+                console.log('[Reader] Duration not available, waiting for metadata...');
+                this.audio.addEventListener('loadedmetadata', () => doSeek(), { once: true });
+                return;
+            }
+            if (!chapter._timingsDuration) {
                 this.computeChapterTimings(this.currentChapter, duration);
             }
             const position = this.getSentencePosition(this.currentChapter, entryIndex);
-            console.log(`[Reader] Seeking to ${position.toFixed(2)}s (duration: ${this.audio.duration})`);
+            console.log(`[Reader] Seeking to ${position.toFixed(2)}s (duration: ${duration})`);
             this.audio.currentTime = position;
             if (!this.isPlaying) {
                 this.audio.play();
@@ -1034,10 +1042,10 @@ class ReadAlongReader {
         if (this.audio.readyState >= 1) {
             doSeek();
         } else {
-            this.audio.addEventListener('loadedmetadata', () => {
-                doSeek();
-            }, { once: true });
-            this.audio.load();
+            this.audio.addEventListener('loadedmetadata', () => doSeek(), { once: true });
+            if (this.audio.readyState < 1) {
+                this.audio.load();
+            }
         }
     }
 
