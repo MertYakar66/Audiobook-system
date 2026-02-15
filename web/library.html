@@ -281,6 +281,24 @@
     </div>
 
     <script src="library.js" defer></script>
+    <script>
+        // Register service worker and clean up any stale root-scope SW
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then((registrations) => {
+                registrations.forEach((reg) => {
+                    // Unregister any SW not scoped to /web/
+                    if (!reg.scope.includes('/web/')) {
+                        reg.unregister().then(() => {
+                            console.log('[App] Unregistered stale SW at scope:', reg.scope);
+                        });
+                    }
+                });
+            });
+            navigator.serviceWorker.register('sw.js').catch((err) => {
+                console.warn('[App] SW registration failed:', err);
+            });
+        }
+    </script>
 </body>
 
 </html>

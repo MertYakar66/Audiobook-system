@@ -21,15 +21,8 @@ const READ_LISTEN_BOOKS = [
 ];
 
 // Read Only books — uploaded but not yet converted
-const READ_ONLY_BOOKS = [
-    {
-        id: "the-intelligent-investor",
-        title: "The Intelligent Investor",
-        author: "Benjamin Graham",
-        sourceFile: "../input/DOCXs/The Intelligent Investor.docx",
-        addedDate: "2025-02-05"
-    }
-];
+// (Books that have been converted to Read & Listen should be removed from here)
+const READ_ONLY_BOOKS = [];
 
 class ScriptumLibrary {
     constructor() {

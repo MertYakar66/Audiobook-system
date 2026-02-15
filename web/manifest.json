@@ -2,7 +2,7 @@
     "name": "Scriptum",
     "short_name": "Scriptum",
     "description": "Your personal audiobook library with synchronized text and notes",
-    "start_url": "/index.html",
+    "start_url": "./library.html",
     "display": "standalone",
     "background_color": "#0a0a0a",
     "theme_color": "#6c5ce7",
