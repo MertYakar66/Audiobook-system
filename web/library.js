@@ -5,9 +5,6 @@
  * and aggregated highlights/notes from all books.
  */
 
-// Books will be loaded from books.json
-const READ_LISTEN_BOOKS = [];
-const READ_ONLY_BOOKS = [];
 // Read & Listen books — uploaded and converted (with TTS audio)
 const READ_LISTEN_BOOKS = [
     {
@@ -61,33 +58,23 @@ class ScriptumLibrary {
     // ==================== DATA LOADING ====================
 
     async loadReadListenBooks() {
-        try {
-            // Load books from books.json with timeout
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+        // Use the hardcoded READ_LISTEN_BOOKS catalog.
+        // For each entry, try to load its manifest.json for accurate metadata.
+        this.readListenBooks = [...READ_LISTEN_BOOKS];
 
-            const response = await fetch('../output/books.json', {
-                signal: controller.signal
-            });
-            clearTimeout(timeout);
-
-            if (response.ok) {
-                const books = await response.json();
-                this.readListenBooks = books.map(book => ({
-                    id: book.id,
-                    path: `../output/${book.path}`,
-                    title: book.title,
-                    author: book.author,
-                    cover: book.cover ? `../output/${book.cover}` : null,
-                    totalDuration: book.totalDuration || 0,
-                    chapterCount: book.chapterCount || 0,
-                    addedDate: new Date().toISOString().split('T')[0]
-                }));
+        for (const book of this.readListenBooks) {
+            try {
+                const resp = await fetch(`${book.path}/manifest.json`);
+                if (resp.ok) {
+                    const manifest = await resp.json();
+                    book.totalDuration = manifest.totalDuration || book.totalDuration;
+                    book.chapterCount = manifest.chapterCount || book.chapterCount;
+                    if (manifest.title) book.title = manifest.title;
+                    if (manifest.author) book.author = manifest.author;
+                }
+            } catch (e) {
+                // Use hardcoded values as fallback
             }
-        } catch (e) {
-            console.warn('Could not load books.json:', e);
-            // Fallback: empty library
-            this.readListenBooks = [];
         }
     }
 
