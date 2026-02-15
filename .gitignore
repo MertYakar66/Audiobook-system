@@ -41,12 +41,7 @@ env/
 Thumbs.db
 desktop.ini
 
-# Project specific - Input/Output directories (large files)
-input/DOCXs/
-input/PDFs/
-input/*.pdf
-input/*.txt
-input/*.docx
+# Project specific - Output directories (large files)
 output/*.m4b
 output/*.mp3
 output/*.wav
@@ -59,6 +54,8 @@ web/books/
 
 # Keep directory structure
 !input/.gitkeep
+!input/DOCXs/.gitkeep
+!input/PDFs/.gitkeep
 !output/.gitkeep
 
 # Logs
