@@ -9,10 +9,10 @@
 const READ_LISTEN_BOOKS = [
     {
         id: "the-intelligent-investor",
-        path: "../output/readalong/The-Intelligent-Investor",
+        path: "books/the-intelligent-investor",
         title: "The Intelligent Investor",
         author: "Benjamin Graham",
-        cover: "../output/readalong/The-Intelligent-Investor/cover.jpg",
+        cover: "books/the-intelligent-investor/cover.jpg",
         sourceFile: "../input/DOCXs/The Intelligent Investor.docx",
         totalDuration: 67953,
         chapterCount: 41,
