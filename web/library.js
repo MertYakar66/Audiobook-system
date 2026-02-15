@@ -8,6 +8,31 @@
 // Books will be loaded from books.json
 const READ_LISTEN_BOOKS = [];
 const READ_ONLY_BOOKS = [];
+// Read & Listen books — uploaded and converted (with TTS audio)
+const READ_LISTEN_BOOKS = [
+    {
+        id: "the-intelligent-investor",
+        path: "books/the-intelligent-investor",
+        title: "The Intelligent Investor",
+        author: "Benjamin Graham",
+        cover: "books/the-intelligent-investor/cover.jpg",
+        sourceFile: "../input/DOCXs/The Intelligent Investor.docx",
+        totalDuration: 67953,
+        chapterCount: 41,
+        addedDate: "2025-02-05"
+    }
+];
+
+// Read Only books — uploaded but not yet converted
+const READ_ONLY_BOOKS = [
+    {
+        id: "the-intelligent-investor",
+        title: "The Intelligent Investor",
+        author: "Benjamin Graham",
+        sourceFile: "../input/DOCXs/The Intelligent Investor.docx",
+        addedDate: "2025-02-05"
+    }
+];
 
 class ScriptumLibrary {
     constructor() {

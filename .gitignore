@@ -42,8 +42,11 @@ Thumbs.db
 desktop.ini
 
 # Project specific - Input/Output directories (large files)
+input/DOCXs/
+input/PDFs/
 input/*.pdf
 input/*.txt
+input/*.docx
 output/*.m4b
 output/*.mp3
 output/*.wav
