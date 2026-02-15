@@ -320,6 +320,8 @@ body {
 .sentence.active {
     background: var(--highlight-bg);
     border-color: var(--highlight-border);
+    font-weight: 600;
+    box-shadow: 0 0 0 1px var(--highlight-border);
 }
 
 .sentence.played {

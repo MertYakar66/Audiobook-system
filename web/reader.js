@@ -923,7 +923,11 @@ class ReadAlongReader {
      */
     highlightCurrentSentence(currentTime) {
         const chapter = this.timingData.chapters[this.currentChapter];
+        if (!chapter || !chapter.entries || chapter.entries.length === 0) return;
         const entries = chapter.entries;
+
+        // Skip if timings haven't been computed yet
+        if (entries[entries.length - 1].end === 0) return;
 
         // Binary search for current sentence (much faster than linear scan)
         let currentIndex = -1;
@@ -1013,7 +1017,8 @@ class ReadAlongReader {
 
         if (entry) {
             if (this.audio.readyState >= 1) {
-                // Audio metadata loaded, seek directly
+                // Ensure timings are computed
+                this.computeApproximateTimings();
                 this.audio.currentTime = entry.start;
                 if (!this.isPlaying) {
                     this.audio.play();
@@ -1021,6 +1026,7 @@ class ReadAlongReader {
             } else {
                 // Audio not ready yet, wait for metadata then seek
                 this.audio.addEventListener('loadedmetadata', () => {
+                    this.computeApproximateTimings();
                     this.audio.currentTime = entry.start;
                     this.audio.play();
                 }, { once: true });
@@ -1102,6 +1108,36 @@ class ReadAlongReader {
      */
     onAudioLoaded() {
         this.totalTimeEl.textContent = this.formatTime(this.audio.duration);
+        this.computeApproximateTimings();
+    }
+
+    /**
+     * Compute approximate sentence timings based on character count
+     * when real timing data is not available (all start/end = 0).
+     */
+    computeApproximateTimings() {
+        const chapter = this.timingData.chapters[this.currentChapter];
+        if (!chapter || !chapter.entries || chapter.entries.length === 0) return;
+
+        // Check if real timings exist (at least one entry with non-zero end)
+        const hasRealTimings = chapter.entries.some(e => e.end > 0);
+        if (hasRealTimings) return;
+
+        const duration = this.audio.duration;
+        if (!duration || isNaN(duration)) return;
+
+        // Calculate total character count
+        const charCounts = chapter.entries.map(e => e.text ? e.text.length : 1);
+        const totalChars = charCounts.reduce((a, b) => a + b, 0);
+
+        // Distribute duration proportionally by character count
+        let currentTime = 0;
+        for (let i = 0; i < chapter.entries.length; i++) {
+            const entryDuration = (charCounts[i] / totalChars) * duration;
+            chapter.entries[i].start = currentTime;
+            chapter.entries[i].end = currentTime + entryDuration;
+            currentTime += entryDuration;
+        }
     }
 
     /**
