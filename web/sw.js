@@ -54,6 +54,11 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
     const url = new URL(event.request.url);
 
+    // Only handle http/https requests, skip chrome-extension, etc.
+    if (!url.protocol.startsWith('http')) {
+        return;
+    }
+
     // Handle audio files differently - cache on first request
     if (isAudioFile(url.pathname)) {
         event.respondWith(cacheFirstAudio(event.request));
@@ -90,8 +95,12 @@ async function cacheFirstAudio(request) {
 
         // Only cache successful responses
         if (response.ok) {
-            console.log('[SW] Caching audio file:', request.url);
-            cache.put(request, response.clone());
+            try {
+                console.log('[SW] Caching audio file:', request.url);
+                await cache.put(request, response.clone());
+            } catch (cacheError) {
+                console.warn('[SW] Failed to cache audio:', request.url, cacheError);
+            }
         }
 
         return response;
@@ -113,8 +122,12 @@ async function networkFirstStatic(request) {
 
         // Update cache with fresh response
         if (response.ok) {
-            const cache = await caches.open(STATIC_CACHE);
-            cache.put(request, response.clone());
+            try {
+                const cache = await caches.open(STATIC_CACHE);
+                await cache.put(request, response.clone());
+            } catch (cacheError) {
+                console.warn('[SW] Failed to cache:', request.url, cacheError);
+            }
         }
 
         return response;
