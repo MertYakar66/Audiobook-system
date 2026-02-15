@@ -1,0 +1,149 @@
+{
+  "version": "2.0",
+  "bookId": "the-intelligent-investor",
+  "title": "The Intelligent Investor",
+  "author": "Benjamin Graham",
+  "cover": null,
+  "timing": "timing.json",
+  "text": "text.json",
+  "totalDuration": 0,
+  "chapterCount": 22,
+  "chapters": [
+    {
+      "id": "ch00",
+      "title": "Introduction",
+      "duration": 0,
+      "sentenceCount": 327
+    },
+    {
+      "id": "ch01",
+      "title": "CHAPTER 1",
+      "duration": 0,
+      "sentenceCount": 416
+    },
+    {
+      "id": "ch02",
+      "title": "CHAPTER 2",
+      "duration": 0,
+      "sentenceCount": 230
+    },
+    {
+      "id": "ch03",
+      "title": "CHAPTER 3",
+      "duration": 0,
+      "sentenceCount": 304
+    },
+    {
+      "id": "ch04",
+      "title": "CHAPTER 4",
+      "duration": 0,
+      "sentenceCount": 373
+    },
+    {
+      "id": "ch05",
+      "title": "CHAPTER 5",
+      "duration": 0,
+      "sentenceCount": 315
+    },
+    {
+      "id": "ch06",
+      "title": "CHAPTER 6",
+      "duration": 0,
+      "sentenceCount": 305
+    },
+    {
+      "id": "ch07",
+      "title": "CHAPTER 7",
+      "duration": 0,
+      "sentenceCount": 498
+    },
+    {
+      "id": "ch08",
+      "title": "CHAPTER 8",
+      "duration": 0,
+      "sentenceCount": 634
+    },
+    {
+      "id": "ch09",
+      "title": "CHAPTER 9",
+      "duration": 0,
+      "sentenceCount": 468
+    },
+    {
+      "id": "ch10",
+      "title": "CHAPTER 10",
+      "duration": 0,
+      "sentenceCount": 355
+    },
+    {
+      "id": "ch11",
+      "title": "CHAPTER 11",
+      "duration": 0,
+      "sentenceCount": 63
+    },
+    {
+      "id": "ch12",
+      "title": "C. Other Categories of Bonds and Preferreds",
+      "duration": 0,
+      "sentenceCount": 359
+    },
+    {
+      "id": "ch13",
+      "title": "CHAPTER 12",
+      "duration": 0,
+      "sentenceCount": 302
+    },
+    {
+      "id": "ch14",
+      "title": "CHAPTER 13",
+      "duration": 0,
+      "sentenceCount": 251
+    },
+    {
+      "id": "ch15",
+      "title": "CHAPTER 14",
+      "duration": 0,
+      "sentenceCount": 340
+    },
+    {
+      "id": "ch16",
+      "title": "CHAPTER 15",
+      "duration": 0,
+      "sentenceCount": 403
+    },
+    {
+      "id": "ch17",
+      "title": "CHAPTER 16",
+      "duration": 0,
+      "sentenceCount": 303
+    },
+    {
+      "id": "ch18",
+      "title": "CHAPTER 17",
+      "duration": 0,
+      "sentenceCount": 379
+    },
+    {
+      "id": "ch19",
+      "title": "CHAPTER 18",
+      "duration": 0,
+      "sentenceCount": 623
+    },
+    {
+      "id": "ch20",
+      "title": "CHAPTER 19",
+      "duration": 0,
+      "sentenceCount": 396
+    },
+    {
+      "id": "ch21",
+      "title": "CHAPTER 20",
+      "duration": 0,
+      "sentenceCount": 1152
+    }
+  ],
+  "generated": {
+    "tts_engine": "pending",
+    "timestamp": "2025-02-05T00:00:00"
+  }
+}
