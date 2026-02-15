@@ -27,6 +27,7 @@ class PDFReader {
         this.renderedPages = new Set();
         this.renderScale = 1.5;
         this.observer = null;
+        this._scrollThrottleTimer = null;
 
         this.init();
     }
@@ -77,11 +78,12 @@ class PDFReader {
             // Set up intersection observer for lazy rendering
             this.setupLazyRendering();
 
-            // Render first visible pages
-            await this.renderPage(this.currentPage);
-            if (this.currentPage + 1 <= this.totalPages) {
-                await this.renderPage(this.currentPage + 1);
+            // Render first visible pages in parallel
+            const pagesToRender = [];
+            for (let i = this.currentPage; i <= Math.min(this.currentPage + 2, this.totalPages); i++) {
+                pagesToRender.push(this.renderPage(i));
             }
+            await Promise.all(pagesToRender);
 
             // Scroll to saved page
             this.scrollToPage(this.currentPage);
@@ -130,10 +132,15 @@ class PDFReader {
             this.observer.observe(el);
         });
 
-        // Track current page on scroll
+        // Track current page on scroll (throttled to avoid jank)
         document.getElementById('viewer').addEventListener('scroll', () => {
-            this.updateCurrentPageFromScroll();
-        });
+            if (!this._scrollThrottleTimer) {
+                this._scrollThrottleTimer = requestAnimationFrame(() => {
+                    this._scrollThrottleTimer = null;
+                    this.updateCurrentPageFromScroll();
+                });
+            }
+        }, { passive: true });
     }
 
     async renderPage(pageNum) {
@@ -164,16 +171,35 @@ class PDFReader {
         const viewerRect = viewer.getBoundingClientRect();
         const viewerCenter = viewerRect.top + viewerRect.height / 3;
 
-        const pages = document.querySelectorAll('.page-wrapper');
-        let closestPage = 1;
+        // Only check pages near the current page instead of all pages
+        const startPage = Math.max(1, this.currentPage - 3);
+        const endPage = Math.min(this.totalPages, this.currentPage + 3);
+        let closestPage = this.currentPage;
         let closestDist = Infinity;
 
-        for (const page of pages) {
+        for (let i = startPage; i <= endPage; i++) {
+            const page = document.getElementById(`page-${i}`);
+            if (!page) continue;
             const rect = page.getBoundingClientRect();
             const dist = Math.abs(rect.top - viewerCenter);
             if (dist < closestDist) {
                 closestDist = dist;
-                closestPage = parseInt(page.dataset.page);
+                closestPage = i;
+            }
+        }
+
+        // If closest is at boundary, expand search in that direction
+        if (closestPage === startPage && startPage > 1) {
+            const prevPage = document.getElementById(`page-${startPage - 1}`);
+            if (prevPage) {
+                const dist = Math.abs(prevPage.getBoundingClientRect().top - viewerCenter);
+                if (dist < closestDist) closestPage = startPage - 1;
+            }
+        } else if (closestPage === endPage && endPage < this.totalPages) {
+            const nextPage = document.getElementById(`page-${endPage + 1}`);
+            if (nextPage) {
+                const dist = Math.abs(nextPage.getBoundingClientRect().top - viewerCenter);
+                if (dist < closestDist) closestPage = endPage + 1;
             }
         }
 
