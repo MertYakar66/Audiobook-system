@@ -1,5 +1,5 @@
 /**
- * Read-Along Reader - Professional Edition
+ * Read-Along Reader - Professional Edition v3
  *
  * Synchronized audio-text playback with:
  * - Sentence highlighting and tap-to-seek
@@ -922,19 +922,26 @@ class ReadAlongReader {
      * Find and highlight the sentence at current time
      */
     highlightCurrentSentence(currentTime) {
-        if (!this.ensureTimings()) return;
-
         const chapter = this.timingData.chapters[this.currentChapter];
+        if (!chapter || !chapter.entries || chapter.entries.length === 0) return;
+
+        const duration = this.audio.duration;
+        if (!duration || !isFinite(duration)) return;
+
+        // Compute timings on first call if not done yet
+        if (!chapter._timingsDuration) {
+            this.computeChapterTimings(this.currentChapter, duration);
+        }
+
         const entries = chapter.entries;
 
-        // Linear scan for current sentence (reliable with approximate timings)
+        // Find current sentence by scanning entries
         let currentIndex = -1;
         for (let i = 0; i < entries.length; i++) {
             if (currentTime >= entries[i].start && currentTime < entries[i].end) {
                 currentIndex = i;
                 break;
             }
-            // If we've passed this entry, keep looking
             if (currentTime < entries[i].start) {
                 currentIndex = i > 0 ? i - 1 : 0;
                 break;
@@ -1009,10 +1016,16 @@ class ReadAlongReader {
         const entryIndex = chapter.entries.findIndex(e => e.id === sentenceId);
         if (entryIndex === -1) return;
 
+        console.log(`[Reader] Seek to sentence ${sentenceId} (index ${entryIndex})`);
+
         const doSeek = () => {
-            this.ensureTimings();
-            const entry = chapter.entries[entryIndex];
-            this.audio.currentTime = entry.start;
+            const duration = this.audio.duration;
+            if (duration && isFinite(duration) && !chapter._timingsDuration) {
+                this.computeChapterTimings(this.currentChapter, duration);
+            }
+            const position = this.getSentencePosition(this.currentChapter, entryIndex);
+            console.log(`[Reader] Seeking to ${position.toFixed(2)}s (duration: ${this.audio.duration})`);
+            this.audio.currentTime = position;
             if (!this.isPlaying) {
                 this.audio.play();
             }
@@ -1021,7 +1034,6 @@ class ReadAlongReader {
         if (this.audio.readyState >= 1) {
             doSeek();
         } else {
-            // Audio not ready yet, wait for metadata then seek
             this.audio.addEventListener('loadedmetadata', () => {
                 doSeek();
             }, { once: true });
@@ -1101,48 +1113,65 @@ class ReadAlongReader {
      * Handle audio loaded
      */
     onAudioLoaded() {
-        this.totalTimeEl.textContent = this.formatTime(this.audio.duration);
-        this.ensureTimings();
+        const duration = this.audio.duration;
+        this.totalTimeEl.textContent = this.formatTime(duration);
+
+        // Compute/recompute timings with real audio duration
+        if (duration && isFinite(duration)) {
+            this.computeChapterTimings(this.currentChapter, duration);
+        }
     }
 
     /**
-     * Ensure sentence timings exist for the current chapter.
-     * Computes approximate timings from audio duration + character count
-     * when real timing data is not available.
-     * Returns true if timings are available, false otherwise.
+     * Compute proportional sentence timings for a chapter.
+     * Distributes the given duration across sentences by character count.
      */
-    ensureTimings() {
-        const chapter = this.timingData.chapters[this.currentChapter];
-        if (!chapter || !chapter.entries || chapter.entries.length === 0) return false;
+    computeChapterTimings(chapterIndex, duration) {
+        const chapter = this.timingData.chapters[chapterIndex];
+        if (!chapter || !chapter.entries || chapter.entries.length === 0) return;
 
-        const duration = this.audio.duration;
-        if (!duration || isNaN(duration) || !isFinite(duration)) return false;
-
-        // Skip if already computed for this exact duration
-        if (chapter._computedForDuration === duration) return true;
-
-        // Skip if real timings exist from TTS (check first AND last entry)
-        if (chapter.entries[0].end > 0 &&
-            chapter.entries[chapter.entries.length - 1].end > 0 &&
-            !chapter._isApproximate) {
-            return true;
-        }
-
-        // Compute proportional timings based on character count
-        const charCounts = chapter.entries.map(e => e.text ? e.text.length : 1);
+        // Always recompute when called with a new duration
+        const charCounts = chapter.entries.map(e => (e.text || '').length || 1);
         const totalChars = charCounts.reduce((a, b) => a + b, 0);
 
-        let currentTime = 0;
+        let t = 0;
         for (let i = 0; i < chapter.entries.length; i++) {
-            const entryDuration = (charCounts[i] / totalChars) * duration;
-            chapter.entries[i].start = currentTime;
-            chapter.entries[i].end = currentTime + entryDuration;
-            currentTime += entryDuration;
+            const d = (charCounts[i] / totalChars) * duration;
+            chapter.entries[i].start = t;
+            chapter.entries[i].end = t + d;
+            t += d;
         }
 
-        chapter._computedForDuration = duration;
-        chapter._isApproximate = true;
-        return true;
+        chapter._timingsDuration = duration;
+        console.log(`[Reader] Computed timings for ch${chapterIndex}: ${chapter.entries.length} entries, ${duration.toFixed(1)}s`);
+    }
+
+    /**
+     * Get the estimated start time for a sentence by index.
+     * Works even if audio duration is unknown (uses position ratio).
+     */
+    getSentencePosition(chapterIndex, entryIndex) {
+        const chapter = this.timingData.chapters[chapterIndex];
+        if (!chapter || !chapter.entries || chapter.entries.length === 0) return 0;
+
+        // If timings have been computed, use them directly
+        if (chapter._timingsDuration) {
+            return chapter.entries[entryIndex].start;
+        }
+
+        // Fallback: estimate from character position ratio
+        const entries = chapter.entries;
+        const charCounts = entries.map(e => (e.text || '').length || 1);
+        const totalChars = charCounts.reduce((a, b) => a + b, 0);
+
+        let charsBeforeEntry = 0;
+        for (let i = 0; i < entryIndex; i++) {
+            charsBeforeEntry += charCounts[i];
+        }
+
+        const ratio = charsBeforeEntry / totalChars;
+        const duration = this.audio.duration;
+        return (duration && isFinite(duration)) ? ratio * duration : 0;
     }
 
     /**
@@ -2109,5 +2138,6 @@ class ReadAlongReader {
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('[Reader] Version 3 loaded');
     window.reader = new ReadAlongReader();
 });
