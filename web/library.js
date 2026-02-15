@@ -15,7 +15,7 @@ const READ_LISTEN_BOOKS = [
         cover: "books/the-intelligent-investor/cover.jpg",
         sourceFile: "../input/DOCXs/The Intelligent Investor.docx",
         totalDuration: 67953,
-        chapterCount: 22,
+        chapterCount: 23,
         addedDate: "2025-02-05"
     }
 ];
