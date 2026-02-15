@@ -7,137 +7,143 @@
   "timing": "timing.json",
   "text": "text.json",
   "totalDuration": 0,
-  "chapterCount": 22,
+  "chapterCount": 23,
   "chapters": [
     {
       "id": "ch00",
-      "title": "Introduction",
+      "title": "Preface",
       "duration": 0,
-      "sentenceCount": 327
+      "sentenceCount": 32
     },
     {
       "id": "ch01",
-      "title": "CHAPTER 1",
+      "title": "A Note About Benjamin Graham",
+      "duration": 0,
+      "sentenceCount": 55
+    },
+    {
+      "id": "ch02",
+      "title": "Introduction",
+      "duration": 0,
+      "sentenceCount": 93
+    },
+    {
+      "id": "ch03",
+      "title": "CHAPTER 1 - Investment versus Speculation: Results to Be Expected by the Intelligent Investor",
       "duration": 0,
       "sentenceCount": 416
     },
     {
-      "id": "ch02",
-      "title": "CHAPTER 2",
+      "id": "ch04",
+      "title": "CHAPTER 2 - The Investor and Inflation",
       "duration": 0,
       "sentenceCount": 230
     },
     {
-      "id": "ch03",
-      "title": "CHAPTER 3",
+      "id": "ch05",
+      "title": "CHAPTER 3 - A Century of Stock-Market History: The Level of Stock Prices in Early 1972",
       "duration": 0,
       "sentenceCount": 304
     },
     {
-      "id": "ch04",
-      "title": "CHAPTER 4",
+      "id": "ch06",
+      "title": "CHAPTER 4 - General Portfolio Policy:",
       "duration": 0,
       "sentenceCount": 373
     },
     {
-      "id": "ch05",
-      "title": "CHAPTER 5",
+      "id": "ch07",
+      "title": "CHAPTER 5 - The Defensive Investor and Common Stocks",
       "duration": 0,
       "sentenceCount": 315
     },
     {
-      "id": "ch06",
-      "title": "CHAPTER 6",
+      "id": "ch08",
+      "title": "CHAPTER 6 - Portfolio Policy for the Enterprising Investor: Negative Approach",
       "duration": 0,
       "sentenceCount": 305
     },
     {
-      "id": "ch07",
-      "title": "CHAPTER 7",
+      "id": "ch09",
+      "title": "CHAPTER 7 - Portfolio Policy for the Enterprising Investor: The Positive Side",
       "duration": 0,
       "sentenceCount": 498
     },
     {
-      "id": "ch08",
-      "title": "CHAPTER 8",
+      "id": "ch10",
+      "title": "CHAPTER 8 - The Investor and Market Fluctuations",
       "duration": 0,
       "sentenceCount": 634
     },
     {
-      "id": "ch09",
-      "title": "CHAPTER 9",
+      "id": "ch11",
+      "title": "CHAPTER 9 - Investing in Investment Funds",
       "duration": 0,
       "sentenceCount": 468
     },
     {
-      "id": "ch10",
-      "title": "CHAPTER 10",
+      "id": "ch12",
+      "title": "CHAPTER 10 - The Investor and His Advisers",
       "duration": 0,
       "sentenceCount": 355
     },
     {
-      "id": "ch11",
-      "title": "CHAPTER 11",
-      "duration": 0,
-      "sentenceCount": 63
-    },
-    {
-      "id": "ch12",
-      "title": "C. Other Categories of Bonds and Preferreds",
-      "duration": 0,
-      "sentenceCount": 359
-    },
-    {
       "id": "ch13",
-      "title": "CHAPTER 12",
+      "title": "CHAPTER 11 - Security Analysis for the Lay Investor: General Approach",
+      "duration": 0,
+      "sentenceCount": 422
+    },
+    {
+      "id": "ch14",
+      "title": "CHAPTER 12 - Things to Consider About Per-Share Earnings",
       "duration": 0,
       "sentenceCount": 302
     },
     {
-      "id": "ch14",
-      "title": "CHAPTER 13",
+      "id": "ch15",
+      "title": "CHAPTER 13 - A Comparison of Four Listed Companies",
       "duration": 0,
       "sentenceCount": 251
     },
     {
-      "id": "ch15",
-      "title": "CHAPTER 14",
+      "id": "ch16",
+      "title": "CHAPTER 14 - Stock Selection for the Defensive Investor",
       "duration": 0,
       "sentenceCount": 340
     },
     {
-      "id": "ch16",
-      "title": "CHAPTER 15",
+      "id": "ch17",
+      "title": "CHAPTER 15 - Stock Selection for the Enterprising Investor",
       "duration": 0,
       "sentenceCount": 403
     },
     {
-      "id": "ch17",
-      "title": "CHAPTER 16",
+      "id": "ch18",
+      "title": "CHAPTER 16 - Convertible Issues and Warrants",
       "duration": 0,
       "sentenceCount": 303
     },
     {
-      "id": "ch18",
-      "title": "CHAPTER 17",
+      "id": "ch19",
+      "title": "CHAPTER 17 - Four Extremely Instructive Case Histories",
       "duration": 0,
       "sentenceCount": 379
     },
     {
-      "id": "ch19",
-      "title": "CHAPTER 18",
+      "id": "ch20",
+      "title": "CHAPTER 18 - A Comparison of Eight Pairs of Companies",
       "duration": 0,
       "sentenceCount": 623
     },
     {
-      "id": "ch20",
-      "title": "CHAPTER 19",
+      "id": "ch21",
+      "title": "CHAPTER 19 - Shareholders and Managements: Dividend Policy",
       "duration": 0,
       "sentenceCount": 396
     },
     {
-      "id": "ch21",
-      "title": "CHAPTER 20",
+      "id": "ch22",
+      "title": "CHAPTER 20 - “Margin of Safety” as the Central Concept of Investment",
       "duration": 0,
       "sentenceCount": 1152
     }
