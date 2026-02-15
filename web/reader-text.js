@@ -11,6 +11,11 @@ const BOOK_SOURCES = {
         pdfFile: "../input/PDFs/The Intelligent Investor.pdf",
         title: "The Intelligent Investor",
         author: "Benjamin Graham"
+    },
+    "the-intelligent-investor-text": {
+        pdfFile: "../input/PDFs/The Intelligent Investor.pdf",
+        title: "The Intelligent Investor",
+        author: "Benjamin Graham"
     }
 };
 
