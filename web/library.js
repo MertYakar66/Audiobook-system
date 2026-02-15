@@ -59,10 +59,10 @@ class ScriptumLibrary {
 
     async loadReadListenBooks() {
         // Use the hardcoded READ_LISTEN_BOOKS catalog.
-        // For each entry, try to load its manifest.json for accurate metadata.
+        // Fetch all manifests in PARALLEL for faster loading.
         this.readListenBooks = [...READ_LISTEN_BOOKS];
 
-        for (const book of this.readListenBooks) {
+        await Promise.all(this.readListenBooks.map(async (book) => {
             try {
                 const resp = await fetch(`${book.path}/manifest.json`);
                 if (resp.ok) {
@@ -75,7 +75,7 @@ class ScriptumLibrary {
             } catch (e) {
                 // Use hardcoded values as fallback
             }
-        }
+        }));
     }
 
     loadBookData() {

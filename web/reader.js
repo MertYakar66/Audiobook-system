@@ -53,6 +53,10 @@ class ReadAlongReader {
         this.sleepTimerEnd = null;
         this.sleepTimerMode = null; // 'minutes' or 'chapter'
 
+        // Performance: throttle/debounce timers
+        this._saveProgressTimer = null;
+        this._lastHighlightUpdate = 0;
+
         // Selection for notes
         this.selectedText = null;
         this.selectedSentenceId = null;
@@ -396,28 +400,23 @@ class ReadAlongReader {
         try {
             this.showLoading(true);
 
-            // Fetch manifest
+            // Fetch manifest first (needed to know timing/text filenames)
             const manifestResponse = await fetch(`${basePath}/manifest.json`);
             if (!manifestResponse.ok) throw new Error('Book not found');
             this.bookData = await manifestResponse.json();
 
-            // Fetch timing data
-            const timingResponse = await fetch(`${basePath}/${this.bookData.timing}`);
-            if (timingResponse.ok) {
-                this.timingData = await timingResponse.json();
-            }
-
-            // Fetch text data
-            const textResponse = await fetch(`${basePath}/${this.bookData.text}`);
-            if (textResponse.ok) {
-                this.textData = await textResponse.json();
-            }
-
             // Store base path for audio files
             this.audioBasePath = basePath;
 
-            // Load page data (for viewing original document pages)
-            await this.loadPagesFromPath(basePath);
+            // Fetch timing, text, and pages data in PARALLEL
+            const [timingResult, textResult] = await Promise.all([
+                fetch(`${basePath}/${this.bookData.timing}`).then(r => r.ok ? r.json() : null).catch(() => null),
+                fetch(`${basePath}/${this.bookData.text}`).then(r => r.ok ? r.json() : null).catch(() => null),
+                this.loadPagesFromPath(basePath)
+            ]);
+
+            this.timingData = timingResult;
+            this.textData = textResult;
 
             // Load bookmarks and notes for this book
             this.loadBookData();
@@ -782,6 +781,7 @@ class ReadAlongReader {
             const mp3Url = `${this.audioBasePath}/audio/${mp3FileName}`;
             const wavUrl = `${this.audioBasePath}/audio/${audioFileName}`;
 
+            this.audio.preload = 'auto';
             this.audio.src = mp3Url;
             this.audio.addEventListener('error', () => {
                 if (this.audio.src.endsWith('.mp3')) {
@@ -790,22 +790,22 @@ class ReadAlongReader {
             }, { once: true });
 
             // Wait for audio to load then seek
-            this.audio.addEventListener('loadedmetadata', () => {
-                if (startPosition > 0) {
+            if (startPosition > 0) {
+                this.audio.addEventListener('loadedmetadata', () => {
                     this.audio.currentTime = startPosition;
-                }
-            }, { once: true });
+                }, { once: true });
+            }
         } else if (this.audioFiles && this.audioFiles[audioFileName]) {
             // Folder-based loading
             const audioUrl = URL.createObjectURL(this.audioFiles[audioFileName]);
             this.audio.src = audioUrl;
 
             // Wait for audio to load then seek
-            this.audio.addEventListener('loadedmetadata', () => {
-                if (startPosition > 0) {
+            if (startPosition > 0) {
+                this.audio.addEventListener('loadedmetadata', () => {
                     this.audio.currentTime = startPosition;
-                }
-            }, { once: true });
+                }, { once: true });
+            }
         }
 
         // Reset progress
@@ -824,7 +824,22 @@ class ReadAlongReader {
      * Render text content with sentence spans
      */
     renderText(chapterData) {
-        this.textContent.innerHTML = '';
+        // Build lookup maps for O(1) access instead of O(n) .find() per sentence
+        const noteMap = new Map();
+        for (const n of this.notes) {
+            noteMap.set(n.sentenceId, n);
+        }
+        const highlightMap = new Map();
+        for (const h of this.highlights) {
+            highlightMap.set(h.sentenceId, h);
+        }
+        const colorMap = new Map();
+        for (const c of this.highlightColors) {
+            colorMap.set(c.name, c.color);
+        }
+
+        // Build DOM with DocumentFragment for single reflow
+        const fragment = document.createDocumentFragment();
 
         chapterData.paragraphs.forEach(paragraph => {
             const paraEl = document.createElement('p');
@@ -837,36 +852,40 @@ class ReadAlongReader {
                 sentenceEl.dataset.id = sentence.id;
                 sentenceEl.textContent = sentence.text + ' ';
 
-                // Check if has note
-                const note = this.notes.find(n => n.sentenceId === sentence.id);
-                if (note) {
+                // Check if has note (O(1) lookup)
+                if (noteMap.has(sentence.id)) {
                     sentenceEl.classList.add('has-note');
                 }
 
-                // Check if has highlight and apply color
-                const highlight = this.highlights.find(h => h.sentenceId === sentence.id);
+                // Check if has highlight and apply color (O(1) lookup)
+                const highlight = highlightMap.get(sentence.id);
                 if (highlight) {
                     sentenceEl.classList.add('highlighted');
-                    sentenceEl.dataset.highlightColor = highlight.color || 'yellow';
-                    const colorObj = this.highlightColors.find(c => c.name === (highlight.color || 'yellow'));
-                    if (colorObj) {
-                        sentenceEl.style.backgroundColor = colorObj.color;
+                    const hColor = highlight.color || 'yellow';
+                    sentenceEl.dataset.highlightColor = hColor;
+                    const bgColor = colorMap.get(hColor);
+                    if (bgColor) {
+                        sentenceEl.style.backgroundColor = bgColor;
                     }
                 }
-
-                // Click to seek (but not when selecting text)
-                sentenceEl.addEventListener('click', (e) => {
-                    // Only seek if not selecting text
-                    if (!window.getSelection().toString().trim()) {
-                        this.seekToSentence(sentence.id);
-                    }
-                });
 
                 paraEl.appendChild(sentenceEl);
             });
 
-            this.textContent.appendChild(paraEl);
+            fragment.appendChild(paraEl);
         });
+
+        // Single DOM write - replace content at once
+        this.textContent.innerHTML = '';
+        this.textContent.appendChild(fragment);
+
+        // Use event delegation instead of per-sentence click listeners
+        this.textContent.onclick = (e) => {
+            const sentenceEl = e.target.closest('.sentence');
+            if (sentenceEl && !window.getSelection().toString().trim()) {
+                this.seekToSentence(sentenceEl.dataset.id);
+            }
+        };
     }
 
     /**
@@ -887,8 +906,13 @@ class ReadAlongReader {
         // Find and highlight current sentence
         this.highlightCurrentSentence(currentTime);
 
-        // Save progress periodically
-        this.saveProgress();
+        // Save progress debounced (every 5 seconds instead of every tick)
+        if (!this._saveProgressTimer) {
+            this._saveProgressTimer = setTimeout(() => {
+                this._saveProgressTimer = null;
+                this.saveProgress();
+            }, 5000);
+        }
 
         // Check sleep timer
         this.checkSleepTimer();
@@ -901,64 +925,65 @@ class ReadAlongReader {
         const chapter = this.timingData.chapters[this.currentChapter];
         const entries = chapter.entries;
 
-        // Find current sentence
+        // Binary search for current sentence (much faster than linear scan)
         let currentIndex = -1;
-        for (let i = 0; i < entries.length; i++) {
-            if (currentTime >= entries[i].start && currentTime < entries[i].end) {
-                currentIndex = i;
+        let lo = 0, hi = entries.length - 1;
+        while (lo <= hi) {
+            const mid = (lo + hi) >> 1;
+            if (currentTime >= entries[mid].start && currentTime < entries[mid].end) {
+                currentIndex = mid;
                 break;
-            }
-            // If between sentences, highlight the upcoming one
-            if (currentTime < entries[i].start) {
-                currentIndex = i > 0 ? i - 1 : -1;
-                break;
+            } else if (currentTime < entries[mid].start) {
+                hi = mid - 1;
+            } else {
+                lo = mid + 1;
             }
         }
 
-        // Handle end of chapter
-        if (currentIndex === -1 && entries.length > 0 && currentTime >= entries[entries.length - 1].start) {
-            currentIndex = entries.length - 1;
+        // Handle gaps between sentences and end of chapter
+        if (currentIndex === -1) {
+            if (entries.length > 0 && currentTime >= entries[entries.length - 1].start) {
+                currentIndex = entries.length - 1;
+            } else if (lo > 0 && lo < entries.length && currentTime < entries[lo].start) {
+                currentIndex = lo - 1;
+            }
         }
 
-        // Update highlighting if changed
+        // Update highlighting only if sentence changed
         if (currentIndex !== this.currentSentenceIndex) {
+            const prevIndex = this.currentSentenceIndex;
             this.currentSentenceIndex = currentIndex;
-            this.updateHighlighting();
+            this.updateHighlighting(prevIndex, currentIndex);
         }
     }
 
     /**
-     * Update sentence highlighting
+     * Update sentence highlighting (incremental - only update changed elements)
      */
-    updateHighlighting() {
+    updateHighlighting(prevIndex, newIndex) {
         const chapter = this.timingData.chapters[this.currentChapter];
         const entries = chapter.entries;
 
-        // Remove active class from all
-        document.querySelectorAll('.sentence.active').forEach(el => {
-            el.classList.remove('active');
-        });
+        // Remove active from previous sentence
+        if (prevIndex >= 0 && prevIndex < entries.length) {
+            const prevEl = document.querySelector(`[data-id="${entries[prevIndex].id}"]`);
+            if (prevEl) {
+                prevEl.classList.remove('active');
+                prevEl.classList.add('played');
+            }
+        }
 
-        // Update played state
-        document.querySelectorAll('.sentence.played').forEach(el => {
-            el.classList.remove('played');
-        });
-
-        // Apply new highlights
-        entries.forEach((entry, index) => {
-            const el = document.querySelector(`[data-id="${entry.id}"]`);
-            if (el) {
-                if (index === this.currentSentenceIndex) {
-                    el.classList.add('active');
-                    // Auto-scroll
-                    if (this.autoScroll && this.isPlaying) {
-                        this.scrollToElement(el);
-                    }
-                } else if (index < this.currentSentenceIndex) {
-                    el.classList.add('played');
+        // Add active to new sentence
+        if (newIndex >= 0 && newIndex < entries.length) {
+            const newEl = document.querySelector(`[data-id="${entries[newIndex].id}"]`);
+            if (newEl) {
+                newEl.classList.add('active');
+                // Auto-scroll
+                if (this.autoScroll && this.isPlaying) {
+                    this.scrollToElement(newEl);
                 }
             }
-        });
+        }
     }
 
     /**
