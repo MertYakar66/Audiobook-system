@@ -6,7 +6,7 @@
  * - Audio files (cached on-demand)
  */
 
-const STATIC_CACHE = 'scriptum-static-v3';
+const STATIC_CACHE = 'scriptum-static-v4';
 const AUDIO_CACHE = 'scriptum-audio-v1';
 
 // Static files to cache on install (paths relative to /web/ scope)
@@ -68,8 +68,13 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // Handle audio files differently - cache on first request
+    // Handle audio files: Range requests must bypass SW for seeking to work
     if (isAudioFile(url.pathname)) {
+        // If this is a Range request (for seeking), let it go directly to the server
+        // The browser needs a 206 Partial Content response which the SW cache can't provide
+        if (event.request.headers.get('range')) {
+            return; // Don't call event.respondWith — let the browser handle it normally
+        }
         event.respondWith(cacheFirstAudio(event.request));
         return;
     }
