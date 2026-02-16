@@ -135,12 +135,25 @@ python scripts/convert_to_mp3.py output/readalong/the-intelligent-investor
 
 This converts all WAV files to MP3 (64kbps mono, ~10x smaller) and updates `timing.json` to reference `.mp3` instead of `.wav`.
 
-### Step 5: Clean Up WAV Files (Optional)
+### Step 5: Validate Timestamps
+Before deleting WAV files, confirm that timing.json has real timestamps:
+```powershell
+python -c "import json; d=json.load(open('output/readalong/the-intelligent-investor/timing.json')); print('OK' if d['chapters'][0]['entries'][0]['end'] > 0 else 'FAIL')"
+```
+Expected output: `OK`
+
+### Step 6: Clean Up WAV Files (Optional)
 ```powershell
 Remove-Item output/readalong/the-intelligent-investor/audio/*.wav
 ```
 
-### Step 6: Test
+### Step 7: Clear Browser Service Worker Cache
+The SW caches audio files in `scriptum-audio-v1`. Stale cached audio will interfere with new files.
+- Open DevTools → Application → Service Workers → Click "Unregister"
+- Or: DevTools → Application → Cache Storage → Delete `scriptum-audio-v1`
+- Then do a hard refresh: `Ctrl + Shift + R`
+
+### Step 8: Test
 1. Start the server: `python serve.py`
 2. Navigate to `http://localhost:8080`
 3. Open the book from the library
@@ -150,7 +163,7 @@ Remove-Item output/readalong/the-intelligent-investor/audio/*.wav
    ```
    (NOT "estimating by word count")
 5. Play audio — highlighting should be perfectly synchronized
-6. Click any sentence — audio should jump to exactly that point
+6. Click any sentence — audio should jump to exactly that point (note: clicking seeks but does not auto-play if audio was paused)
 7. Drag the progress bar — highlighting should follow accurately
 
 ---
@@ -162,7 +175,7 @@ Remove-Item output/readalong/the-intelligent-investor/audio/*.wav
 |------|---------|
 | `scripts/readalong/book_processor.py` | Main orchestrator — `process_book()` runs the full pipeline |
 | `scripts/readalong/timed_tts_edge.py` | Edge TTS engine — generates audio + timestamps per sentence |
-| `scripts/readalong/timed_tts.py` | TTS engine selector (Edge → Tortoise → pyttsx3 fallback) |
+| `scripts/readalong/timed_tts.py` | TTS engine selector (Edge → pyttsx3 fallback) |
 | `scripts/readalong/timing_map.py` | Builds and saves `timing.json` from `TimedSegment` objects |
 | `scripts/readalong/sentence_splitter.py` | Splits chapter text into sentence objects with IDs |
 | `scripts/convert_to_mp3.py` | WAV → MP3 conversion + timing.json reference update |
@@ -232,10 +245,12 @@ These fixes are in the current codebase and will work immediately after audio re
 
 1. **Progress bar seeking**: Fixed flicker/reset during drag with `isDragging` flag
 2. **Mobile scrubbing**: Added touch event handlers (touchstart, touchmove, touchend)
-3. **Click-to-seek**: Fixed by computing timings, resetting played state, and cancelling pending seek listeners
+3. **Click-to-seek**: Fixed tautological auto-play condition; now only resumes if audio was playing before seek
 4. **Stuck highlights**: Fixed by clearing ALL `.active` elements when doing a fresh seek
 5. **Service Worker Range bypass**: SW now passes through Range requests directly to the server (required for audio seeking)
 6. **Library path fix**: Book data path corrected from `books/` to `../output/readalong/`
 7. **Cache busting**: CSS `?v=4`, JS `?v=5`, SW cache `v4`
 8. **Active sentence glow**: Purple glow effect on the currently playing sentence
 9. **Real timestamp detection**: `computeChapterTimings()` preserves real timestamps instead of overwriting
+10. **Manifest engine label**: Now dynamically detects actual TTS engine instead of hardcoding "tortoise"
+11. **Tortoise TTS removal**: Removed Tortoise TTS references from pipeline; Edge TTS is the sole engine with pyttsx3 fallback

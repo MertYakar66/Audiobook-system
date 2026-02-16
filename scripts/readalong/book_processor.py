@@ -4,15 +4,13 @@ Book Processor Module - Enhanced Edition
 Orchestrates the complete Read-Along book processing pipeline.
 Converts books to synchronized audio-text format with timing maps.
 
-Now uses Tortoise TTS for high-quality, natural speech with voice cloning.
+Uses Edge TTS for fast, high-quality neural speech synthesis.
 
 Features:
 - Resume interrupted processing from last completed chapter
 - Progress state persistence
 - Memory-optimized batch processing
-- GPU acceleration support
-- Voice cloning from custom audio samples
-- Quality presets (ultra_fast, fast, standard, high_quality)
+- Per-sentence timestamp generation for precise audio-text sync
 """
 
 import gc
@@ -29,7 +27,7 @@ from scripts.clean_text import TextCleaner, ChapterDetector
 from scripts.extract_text import PDFExtractor
 from scripts.metadata import MetadataExtractor, CoverArtHandler
 from scripts.readalong.sentence_splitter import SentenceSplitter, Sentence
-from scripts.readalong.timed_tts import TimedTTSGenerator, TimedSegment
+from scripts.readalong.timed_tts import TimedTTSGenerator, TimedSegment, get_tts_engine
 from scripts.readalong.timing_map import TimingMap, BookTimingMap, ChapterTiming
 from scripts.utils.config import config
 from scripts.utils import logger
@@ -76,7 +74,7 @@ class ProcessingState:
     chapter_data: Dict[str, Any] = field(default_factory=dict)
     started_at: str = ""
     last_updated: str = ""
-    voice: str = "train_dotrice"
+    voice: str = "en-US-DavisNeural"
     speed: float = 1.0
     preset: str = "fast"
 
@@ -555,7 +553,7 @@ class BookProcessor:
                 "voice": self.voice,
                 "speed": self.speed,
                 "preset": self.preset,
-                "tts_engine": "tortoise",
+                "tts_engine": get_tts_engine() or "unknown",
                 "timestamp": datetime.now().isoformat(),
             },
         }

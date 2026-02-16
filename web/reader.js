@@ -1095,7 +1095,7 @@ class ReadAlongReader {
             this.currentSentenceIndex = -1;
             this.highlightCurrentSentence(entry.start);
 
-            if (wasPlaying || !this.isPlaying) {
+            if (wasPlaying) {
                 this.audio.play();
             }
         };
