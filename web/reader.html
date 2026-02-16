@@ -9,7 +9,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <link rel="manifest" href="manifest.json">
     <title>Scriptum Reader</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=4">
 </head>
 
 <body>
@@ -40,8 +40,8 @@
                 </button>
                 <button id="page-view-btn" class="icon-btn" title="View Original Pages">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="3" y="3" width="7" height="18" rx="1"/>
-                        <rect x="14" y="3" width="7" height="18" rx="1"/>
+                        <rect x="3" y="3" width="7" height="18" rx="1" />
+                        <rect x="14" y="3" width="7" height="18" rx="1" />
                     </svg>
                 </button>
                 <button id="settings-btn" class="icon-btn" title="Settings">
@@ -199,7 +199,8 @@
                 <!-- Bookmarks Tab -->
                 <div id="bookmarks-tab" class="tab-content active">
                     <div id="bookmarks-list" class="bookmarks-list">
-                        <p class="empty-message">No bookmarks yet. Click the bookmark button while listening to add one.</p>
+                        <p class="empty-message">No bookmarks yet. Click the bookmark button while listening to add one.
+                        </p>
                     </div>
                 </div>
 
@@ -220,10 +221,11 @@
                 <!-- Export Button -->
                 <div class="panel-footer">
                     <button id="export-notes-btn" class="secondary-btn export-btn">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                            <polyline points="7 10 12 15 17 10"/>
-                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"
+                            height="16">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="7 10 12 15 17 10" />
+                            <line x1="12" y1="15" x2="12" y2="3" />
                         </svg>
                         Export All
                     </button>
@@ -322,7 +324,7 @@
         <div id="toast" class="toast"></div>
     </div>
 
-    <script src="reader.js"></script>
+    <script src="reader.js?v=5"></script>
     <script>
         // Register service worker for offline support
         if ('serviceWorker' in navigator) {

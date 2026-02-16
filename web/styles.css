@@ -69,7 +69,9 @@
 }
 
 /* Reset */
-*, *::before, *::after {
+*,
+*::before,
+*::after {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
@@ -243,7 +245,9 @@ body {
 }
 
 @keyframes spin {
-    to { transform: rotate(360deg); }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 /* Reader View */
@@ -309,7 +313,7 @@ body {
     padding: 2px 4px;
     margin: 0 -4px;
     border-radius: 4px;
-    transition: all 0.2s ease;
+    transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
     border: 2px solid transparent;
 }
 
@@ -320,6 +324,9 @@ body {
 .sentence.active {
     background: var(--highlight-bg);
     border-color: var(--highlight-border);
+    font-weight: 600;
+    box-shadow: 0 0 8px 2px rgba(108, 92, 231, 0.25), 0 0 0 1px var(--highlight-border);
+    transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .sentence.played {
@@ -365,6 +372,18 @@ body {
     cursor: pointer;
     position: relative;
     overflow: visible;
+    /* Larger touch target for mobile */
+    touch-action: none;
+}
+
+.progress-bar::before {
+    content: '';
+    position: absolute;
+    top: -12px;
+    bottom: -12px;
+    left: 0;
+    right: 0;
+    z-index: 1;
 }
 
 .progress-fill {
@@ -386,11 +405,18 @@ body {
     transform: translate(-50%, -50%);
     cursor: grab;
     opacity: 0;
-    transition: opacity 0.2s;
+    transition: opacity 0.2s, transform 0.15s;
+    z-index: 2;
 }
 
-.progress-bar:hover .progress-handle {
+.progress-bar:hover .progress-handle,
+.progress-handle.dragging {
     opacity: 1;
+    transform: translate(-50%, -50%) scale(1.25);
+}
+
+.progress-bar:hover {
+    height: 10px;
 }
 
 /* Bookmark markers on progress bar */
@@ -600,13 +626,15 @@ body {
 }
 
 /* Bookmarks List */
-.bookmarks-list, .notes-list {
+.bookmarks-list,
+.notes-list {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
 }
 
-.bookmark-item, .note-item {
+.bookmark-item,
+.note-item {
     padding: 0.75rem;
     background: var(--header-bg);
     border-radius: 8px;
@@ -614,7 +642,8 @@ body {
     transition: all 0.2s;
 }
 
-.bookmark-item:hover, .note-item:hover {
+.bookmark-item:hover,
+.note-item:hover {
     background: var(--border-color);
 }
 
@@ -647,7 +676,8 @@ body {
     color: var(--text-color);
 }
 
-.bookmark-delete, .note-delete {
+.bookmark-delete,
+.note-delete {
     float: right;
     background: none;
     border: none;
@@ -1005,11 +1035,11 @@ body {
     transition: 0.3s;
 }
 
-.toggle input:checked + .toggle-slider {
+.toggle input:checked+.toggle-slider {
     background: var(--button-bg);
 }
 
-.toggle input:checked + .toggle-slider::before {
+.toggle input:checked+.toggle-slider::before {
     transform: translateX(22px);
 }
 
@@ -1185,6 +1215,7 @@ body {
 
 /* Responsive Design */
 @media (max-width: 900px) {
+
     /* Stack split view vertically on smaller screens */
     .split-container.split-view {
         flex-direction: column;
@@ -1424,7 +1455,8 @@ body {
     margin: 0.25rem 0;
 }
 
-.highlight-date, .note-date {
+.highlight-date,
+.note-date {
     font-size: 0.7rem;
     color: var(--text-secondary);
     margin-top: 0.5rem;
@@ -1477,8 +1509,15 @@ body {
 /* ==================== Flash Animation ==================== */
 
 @keyframes flash-highlight {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
 }
 
 .sentence.flash {
@@ -1627,7 +1666,14 @@ body {
 
 /* Print styles */
 @media print {
-    .header, .player, .settings-panel, .chapter-nav, .side-panel, .modal, .selection-toolbar {
+
+    .header,
+    .player,
+    .settings-panel,
+    .chapter-nav,
+    .side-panel,
+    .modal,
+    .selection-toolbar {
         display: none !important;
     }
 

@@ -9,13 +9,13 @@
 const READ_LISTEN_BOOKS = [
     {
         id: "the-intelligent-investor",
-        path: "books/the-intelligent-investor",
+        path: "../output/readalong/the-intelligent-investor",
         title: "The Intelligent Investor",
         author: "Benjamin Graham",
-        cover: "books/the-intelligent-investor/cover.jpg",
+        cover: "../output/readalong/the-intelligent-investor/cover.jpg",
         sourceFile: "../input/DOCXs/The Intelligent Investor.docx",
         totalDuration: 67953,
-        chapterCount: 22,
+        chapterCount: 21,
         addedDate: "2025-02-05"
     }
 ];
@@ -202,9 +202,9 @@ class ScriptumLibrary {
             <a href="${href}" class="book-card" id="${cardId}">
                 <div class="cover-container">
                     ${book.cover
-                        ? `<img src="${book.cover}" alt="${this.escapeHtml(book.title)}" class="cover" data-fallback="true">`
-                        : this.coverPlaceholderSvg(32)
-                    }
+                ? `<img src="${book.cover}" alt="${this.escapeHtml(book.title)}" class="cover" data-fallback="true">`
+                : this.coverPlaceholderSvg(32)
+            }
                     ${duration ? `<span class="duration-badge">${duration}</span>` : ''}
                     ${percent > 0 ? `
                         <div class="progress-overlay">
@@ -249,9 +249,9 @@ class ScriptumLibrary {
             <a href="${href}" class="book-card">
                 <div class="cover-container">
                     ${book.cover
-                        ? `<img src="${book.cover}" alt="${this.escapeHtml(book.title)}" class="cover" data-fallback="true">`
-                        : this.coverPlaceholderSvg(20)
-                    }
+                ? `<img src="${book.cover}" alt="${this.escapeHtml(book.title)}" class="cover" data-fallback="true">`
+                : this.coverPlaceholderSvg(20)
+            }
                 </div>
                 <div class="book-info">
                     <div class="book-title">${this.escapeHtml(book.title)}</div>
@@ -317,7 +317,7 @@ class ScriptumLibrary {
 
     findBookById(bookId) {
         return this.readListenBooks.find(b => b.id === bookId) ||
-               READ_LISTEN_BOOKS.find(b => b.id === bookId);
+            READ_LISTEN_BOOKS.find(b => b.id === bookId);
     }
 
     getChapterTitle(book, chapterIndex) {
@@ -488,8 +488,8 @@ class ScriptumLibrary {
                 const book = this.findBookById(item.bookId);
                 const bookTitle = book ? book.title : '';
                 return text.toLowerCase().includes(query) ||
-                       noteText.toLowerCase().includes(query) ||
-                       bookTitle.toLowerCase().includes(query);
+                    noteText.toLowerCase().includes(query) ||
+                    bookTitle.toLowerCase().includes(query);
             });
 
             const list = document.getElementById('notes-list');
@@ -628,7 +628,7 @@ class ScriptumLibrary {
     formatDate(dateStr) {
         const date = new Date(dateStr);
         const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         return `${months[date.getMonth()]} ${date.getDate()}`;
     }
 

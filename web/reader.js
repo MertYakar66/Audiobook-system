@@ -1,5 +1,5 @@
 /**
- * Read-Along Reader - Professional Edition
+ * Read-Along Reader - Professional Edition v3
  *
  * Synchronized audio-text playback with:
  * - Sentence highlighting and tap-to-seek
@@ -57,6 +57,9 @@ class ReadAlongReader {
         this._saveProgressTimer = null;
         this._lastHighlightUpdate = 0;
 
+        // Dragging state for progress bar
+        this.isDragging = false;
+
         // Selection for notes
         this.selectedText = null;
         this.selectedSentenceId = null;
@@ -97,7 +100,7 @@ class ReadAlongReader {
 
         // Book catalog for URL-based loading
         this.booksCatalog = {
-            'the-intelligent-investor': 'books/the-intelligent-investor'
+            'the-intelligent-investor': '../output/readalong/the-intelligent-investor'
         };
 
         // Initialize
@@ -226,8 +229,8 @@ class ReadAlongReader {
         toolbar.innerHTML = `
             <div class="toolbar-colors">
                 ${this.highlightColors.map(c =>
-                    `<button class="color-btn" data-color="${c.name}" style="background: ${c.color}" title="Highlight ${c.name}"></button>`
-                ).join('')}
+            `<button class="color-btn" data-color="${c.name}" style="background: ${c.color}" title="Highlight ${c.name}"></button>`
+        ).join('')}
             </div>
             <div class="toolbar-actions">
                 <button class="toolbar-btn" id="toolbar-highlight" title="Highlight">
@@ -450,12 +453,18 @@ class ReadAlongReader {
             this.audio.currentTime = Math.max(0, this.audio.currentTime - 10);
         });
         document.getElementById('skip-forward').addEventListener('click', () => {
-            this.audio.currentTime = Math.min(this.audio.duration, this.audio.currentTime + 30);
+            const duration = this.audio.duration;
+            const newTime = this.audio.currentTime + 30;
+            this.audio.currentTime = (duration && isFinite(duration)) ? Math.min(duration, newTime) : newTime;
         });
 
-        // Progress bar
-        this.progressBar.addEventListener('click', (e) => this.seekTo(e));
-        this.progressBar.addEventListener('mousedown', () => this.startDragging());
+        // Progress bar - mouse events
+        this.progressBar.addEventListener('mousedown', (e) => this.startDragging(e));
+
+        // Progress bar - touch events for mobile scrubbing
+        this.progressBar.addEventListener('touchstart', (e) => this.startDraggingTouch(e), { passive: false });
+        this.progressBar.addEventListener('touchmove', (e) => this.onDraggingTouch(e), { passive: false });
+        this.progressBar.addEventListener('touchend', (e) => this.endDraggingTouch(e), { passive: false });
 
         // Speed control
         document.getElementById('speed-btn').addEventListener('click', () => {
@@ -892,13 +901,18 @@ class ReadAlongReader {
      * Handle audio time updates
      */
     onTimeUpdate() {
+        // Skip progress bar updates while user is dragging
+        if (this.isDragging) return;
+
         const currentTime = this.audio.currentTime;
         const duration = this.audio.duration || 0;
 
         // Update progress bar
-        const percent = (currentTime / duration) * 100;
-        this.progressFill.style.width = `${percent}%`;
-        this.progressHandle.style.left = `${percent}%`;
+        if (duration && isFinite(duration)) {
+            const percent = (currentTime / duration) * 100;
+            this.progressFill.style.width = `${percent}%`;
+            this.progressHandle.style.left = `${percent}%`;
+        }
 
         // Update time display
         this.currentTimeEl.textContent = this.formatTime(currentTime);
@@ -923,30 +937,34 @@ class ReadAlongReader {
      */
     highlightCurrentSentence(currentTime) {
         const chapter = this.timingData.chapters[this.currentChapter];
+        if (!chapter || !chapter.entries || chapter.entries.length === 0) return;
+
+        const duration = this.audio.duration;
+        if (!duration || !isFinite(duration)) return;
+
+        // Compute timings on first call if not done yet
+        if (!chapter._timingsDuration) {
+            this.computeChapterTimings(this.currentChapter, duration);
+        }
+
         const entries = chapter.entries;
 
-        // Binary search for current sentence (much faster than linear scan)
+        // Find current sentence by scanning entries
         let currentIndex = -1;
-        let lo = 0, hi = entries.length - 1;
-        while (lo <= hi) {
-            const mid = (lo + hi) >> 1;
-            if (currentTime >= entries[mid].start && currentTime < entries[mid].end) {
-                currentIndex = mid;
+        for (let i = 0; i < entries.length; i++) {
+            if (currentTime >= entries[i].start && currentTime < entries[i].end) {
+                currentIndex = i;
                 break;
-            } else if (currentTime < entries[mid].start) {
-                hi = mid - 1;
-            } else {
-                lo = mid + 1;
+            }
+            if (currentTime < entries[i].start) {
+                currentIndex = i > 0 ? i - 1 : 0;
+                break;
             }
         }
 
-        // Handle gaps between sentences and end of chapter
-        if (currentIndex === -1) {
-            if (entries.length > 0 && currentTime >= entries[entries.length - 1].start) {
-                currentIndex = entries.length - 1;
-            } else if (lo > 0 && lo < entries.length && currentTime < entries[lo].start) {
-                currentIndex = lo - 1;
-            }
+        // Handle end of chapter
+        if (currentIndex === -1 && entries.length > 0 && currentTime >= entries[entries.length - 1].start) {
+            currentIndex = entries.length - 1;
         }
 
         // Update highlighting only if sentence changed
@@ -964,13 +982,26 @@ class ReadAlongReader {
         const chapter = this.timingData.chapters[this.currentChapter];
         const entries = chapter.entries;
 
-        // Remove active from previous sentence
+        // If seeking backward or resetting, clear 'played' class from sentences after newIndex
+        if (newIndex < prevIndex || prevIndex === -1) {
+            this.resetPlayedState(newIndex);
+        }
+
+        // Remove active from previous sentence(s)
         if (prevIndex >= 0 && prevIndex < entries.length) {
             const prevEl = document.querySelector(`[data-id="${entries[prevIndex].id}"]`);
             if (prevEl) {
                 prevEl.classList.remove('active');
-                prevEl.classList.add('played');
+                // Only mark as played if moving forward
+                if (newIndex > prevIndex) {
+                    prevEl.classList.add('played');
+                }
             }
+        } else {
+            // prevIndex is -1 (reset/seek) — clear ALL active elements
+            this.textContent.querySelectorAll('.sentence.active').forEach(el => {
+                el.classList.remove('active');
+            });
         }
 
         // Add active to new sentence
@@ -978,10 +1009,28 @@ class ReadAlongReader {
             const newEl = document.querySelector(`[data-id="${entries[newIndex].id}"]`);
             if (newEl) {
                 newEl.classList.add('active');
-                // Auto-scroll
-                if (this.autoScroll && this.isPlaying) {
+                newEl.classList.remove('played');
+                // Auto-scroll to active sentence
+                if (this.autoScroll) {
                     this.scrollToElement(newEl);
                 }
+            }
+        }
+    }
+
+    /**
+     * Reset 'played' state for all sentences after the given index.
+     * Called when seeking backward so future sentences don't look dimmed.
+     */
+    resetPlayedState(fromIndex) {
+        const chapter = this.timingData.chapters[this.currentChapter];
+        if (!chapter || !chapter.entries) return;
+
+        const entries = chapter.entries;
+        for (let i = fromIndex; i < entries.length; i++) {
+            const el = document.querySelector(`[data-id="${entries[i].id}"]`);
+            if (el) {
+                el.classList.remove('played', 'active');
             }
         }
     }
@@ -1009,54 +1058,146 @@ class ReadAlongReader {
      */
     seekToSentence(sentenceId) {
         const chapter = this.timingData.chapters[this.currentChapter];
-        const entry = chapter.entries.find(e => e.id === sentenceId);
+        const entryIndex = chapter.entries.findIndex(e => e.id === sentenceId);
+        if (entryIndex === -1) return;
 
-        if (entry) {
-            if (this.audio.readyState >= 1) {
-                // Audio metadata loaded, seek directly
-                this.audio.currentTime = entry.start;
-                if (!this.isPlaying) {
-                    this.audio.play();
-                }
-            } else {
-                // Audio not ready yet, wait for metadata then seek
-                this.audio.addEventListener('loadedmetadata', () => {
-                    this.audio.currentTime = entry.start;
-                    this.audio.play();
-                }, { once: true });
-                this.audio.load();
+        console.log(`[Reader] Seek to sentence ${sentenceId} (index ${entryIndex})`);
+
+        // Cancel any pending seek to prevent overlapping seeks
+        if (this._pendingSeekListener) {
+            this.audio.removeEventListener('loadedmetadata', this._pendingSeekListener);
+            this._pendingSeekListener = null;
+        }
+
+        const doSeek = () => {
+            this._pendingSeekListener = null;
+            const duration = this.audio.duration;
+            if (!duration || !isFinite(duration)) {
+                console.log('[Reader] Duration not available, waiting...');
+                this._pendingSeekListener = () => doSeek();
+                this.audio.addEventListener('loadedmetadata', this._pendingSeekListener, { once: true });
+                return;
+            }
+            // Always ensure timings are computed
+            if (!chapter._timingsDuration || chapter._timingsDuration !== duration) {
+                this.computeChapterTimings(this.currentChapter, duration);
+            }
+            const entry = chapter.entries[entryIndex];
+            console.log(`[Reader] Seeking to ${entry.start.toFixed(2)}s (duration: ${duration.toFixed(3)})`);
+
+            // Pause briefly to prevent audio glitching during seek
+            const wasPlaying = this.isPlaying;
+            this.audio.pause();
+            this.audio.currentTime = entry.start;
+
+            // Reset played state and force highlight update
+            this.resetPlayedState(entryIndex);
+            this.currentSentenceIndex = -1;
+            this.highlightCurrentSentence(entry.start);
+
+            if (wasPlaying) {
+                this.audio.play();
+            }
+        };
+
+        if (this.audio.readyState >= 1) {
+            doSeek();
+        } else {
+            this._pendingSeekListener = () => doSeek();
+            this.audio.addEventListener('loadedmetadata', this._pendingSeekListener, { once: true });
+            this.audio.load();
+        }
+    }
+
+    /**
+     * Seek audio to a position given a clientX coordinate on the progress bar
+     */
+    seekToPosition(clientX) {
+        const rect = this.progressBar.getBoundingClientRect();
+        const percent = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+        const duration = this.audio.duration;
+        if (duration && isFinite(duration)) {
+            this.audio.currentTime = percent * duration;
+            // Reset played state when seeking
+            const chapter = this.timingData?.chapters?.[this.currentChapter];
+            if (chapter && chapter.entries) {
+                this.currentSentenceIndex = -1;
+                this.highlightCurrentSentence(this.audio.currentTime);
             }
         }
     }
 
     /**
-     * Handle progress bar click
+     * Update progress bar visuals during drag (without seeking audio)
      */
-    seekTo(event) {
+    updateProgressVisual(clientX) {
         const rect = this.progressBar.getBoundingClientRect();
-        const percent = (event.clientX - rect.left) / rect.width;
-        this.audio.currentTime = percent * this.audio.duration;
+        const percent = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+        this.progressFill.style.width = `${percent * 100}%`;
+        this.progressHandle.style.left = `${percent * 100}%`;
+        this.progressHandle.style.opacity = '1';
+
+        // Update time display preview during drag
+        const duration = this.audio.duration;
+        if (duration && isFinite(duration)) {
+            this.currentTimeEl.textContent = this.formatTime(percent * duration);
+        }
     }
 
     /**
-     * Start dragging progress handle
+     * Start dragging progress handle (mouse)
      */
-    startDragging() {
+    startDragging(e) {
+        e.preventDefault();
+        this.isDragging = true;
+
+        // Immediately update visual to click position
+        this.updateProgressVisual(e.clientX);
+
         const onMouseMove = (e) => {
-            const rect = this.progressBar.getBoundingClientRect();
-            const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-            this.progressFill.style.width = `${percent * 100}%`;
-            this.progressHandle.style.left = `${percent * 100}%`;
+            this.updateProgressVisual(e.clientX);
         };
 
         const onMouseUp = (e) => {
             document.removeEventListener('mousemove', onMouseMove);
             document.removeEventListener('mouseup', onMouseUp);
-            this.seekTo(e);
+            this.isDragging = false;
+            this.seekToPosition(e.clientX);
         };
 
         document.addEventListener('mousemove', onMouseMove);
         document.addEventListener('mouseup', onMouseUp);
+    }
+
+    /**
+     * Start dragging progress handle (touch)
+     */
+    startDraggingTouch(e) {
+        e.preventDefault();
+        this.isDragging = true;
+        const touch = e.touches[0];
+        this.updateProgressVisual(touch.clientX);
+    }
+
+    /**
+     * Continue dragging progress handle (touch)
+     */
+    onDraggingTouch(e) {
+        if (!this.isDragging) return;
+        e.preventDefault();
+        const touch = e.touches[0];
+        this.updateProgressVisual(touch.clientX);
+    }
+
+    /**
+     * End dragging progress handle (touch)
+     */
+    endDraggingTouch(e) {
+        if (!this.isDragging) return;
+        e.preventDefault();
+        this.isDragging = false;
+        const touch = e.changedTouches[0];
+        this.seekToPosition(touch.clientX);
     }
 
     /**
@@ -1101,7 +1242,83 @@ class ReadAlongReader {
      * Handle audio loaded
      */
     onAudioLoaded() {
-        this.totalTimeEl.textContent = this.formatTime(this.audio.duration);
+        const duration = this.audio.duration;
+        this.totalTimeEl.textContent = this.formatTime(duration);
+
+        // Compute/recompute timings with real audio duration
+        if (duration && isFinite(duration)) {
+            this.computeChapterTimings(this.currentChapter, duration);
+        }
+    }
+
+    /**
+     * Ensure chapter has valid sentence timings.
+     * If timing.json already has real timestamps (non-zero), use them.
+     * Otherwise, fall back to proportional word-count estimation.
+     */
+    computeChapterTimings(chapterIndex, duration) {
+        const chapter = this.timingData.chapters[chapterIndex];
+        if (!chapter || !chapter.entries || chapter.entries.length === 0) return;
+
+        // Check if timing.json already has real timestamps
+        // (real timestamps = at least one entry has non-zero start or end)
+        const hasRealTimings = chapter.entries.some(e => e.start > 0 || e.end > 0);
+
+        if (hasRealTimings) {
+            // Use the real timestamps from timing.json — no overwriting!
+            chapter._timingsDuration = duration;
+            console.log(`[Reader] Using real timings for ch${chapterIndex}: ${chapter.entries.length} entries, ${duration.toFixed(1)}s`);
+            return;
+        }
+
+        // Fallback: proportional estimation by word count
+        // (only used when timing.json has all zeros, i.e. no real timestamps)
+        console.log(`[Reader] No real timings for ch${chapterIndex}, estimating by word count...`);
+
+        const wordCounts = chapter.entries.map(e => {
+            const text = (e.text || '').trim();
+            return text ? text.split(/\s+/).length : 1;
+        });
+        const totalWords = wordCounts.reduce((a, b) => a + b, 0);
+
+        let t = 0;
+        for (let i = 0; i < chapter.entries.length; i++) {
+            const d = (wordCounts[i] / totalWords) * duration;
+            chapter.entries[i].start = t;
+            chapter.entries[i].end = t + d;
+            t += d;
+        }
+
+        chapter._timingsDuration = duration;
+        console.log(`[Reader] Estimated timings for ch${chapterIndex}: ${chapter.entries.length} entries, ${duration.toFixed(1)}s`);
+    }
+
+    /**
+     * Get the estimated start time for a sentence by index.
+     * Works even if audio duration is unknown (uses position ratio).
+     */
+    getSentencePosition(chapterIndex, entryIndex) {
+        const chapter = this.timingData.chapters[chapterIndex];
+        if (!chapter || !chapter.entries || chapter.entries.length === 0) return 0;
+
+        // If timings have been computed, use them directly
+        if (chapter._timingsDuration) {
+            return chapter.entries[entryIndex].start;
+        }
+
+        // Fallback: estimate from character position ratio
+        const entries = chapter.entries;
+        const charCounts = entries.map(e => (e.text || '').length || 1);
+        const totalChars = charCounts.reduce((a, b) => a + b, 0);
+
+        let charsBeforeEntry = 0;
+        for (let i = 0; i < entryIndex; i++) {
+            charsBeforeEntry += charCounts[i];
+        }
+
+        const ratio = charsBeforeEntry / totalChars;
+        const duration = this.audio.duration;
+        return (duration && isFinite(duration)) ? ratio * duration : 0;
     }
 
     /**
@@ -2068,5 +2285,6 @@ class ReadAlongReader {
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('[Reader] Version 3 loaded');
     window.reader = new ReadAlongReader();
 });
