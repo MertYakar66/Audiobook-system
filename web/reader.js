@@ -783,7 +783,7 @@ class ReadAlongReader {
             const mp3Url = `${this.audioBasePath}/audio/${mp3FileName}`;
             const wavUrl = `${this.audioBasePath}/audio/${audioFileName}`;
 
-            this.audio.preload = 'metadata';
+            this.audio.preload = 'auto';
             this.audio.src = mp3Url;
             this.audio.addEventListener('error', () => {
                 if (this.audio.src.endsWith('.mp3')) {
@@ -1018,22 +1018,14 @@ class ReadAlongReader {
         const entryIndex = chapter.entries.findIndex(e => e.id === sentenceId);
         if (entryIndex === -1) return;
 
-        console.log(`[Reader] Seek to sentence ${sentenceId} (index ${entryIndex})`);
-
         const doSeek = () => {
+            // Compute proportional timings if not done yet
             const duration = this.audio.duration;
-            if (!duration || !isFinite(duration)) {
-                // Duration not available yet - can't compute position, wait for metadata
-                console.log('[Reader] Duration not available, waiting for metadata...');
-                this.audio.addEventListener('loadedmetadata', () => doSeek(), { once: true });
-                return;
-            }
-            if (!chapter._timingsDuration) {
+            if (duration && isFinite(duration) && !chapter._timingsDuration) {
                 this.computeChapterTimings(this.currentChapter, duration);
             }
-            const position = this.getSentencePosition(this.currentChapter, entryIndex);
-            console.log(`[Reader] Seeking to ${position.toFixed(2)}s (duration: ${duration})`);
-            this.audio.currentTime = position;
+            const entry = chapter.entries[entryIndex];
+            this.audio.currentTime = entry.start;
             if (!this.isPlaying) {
                 this.audio.play();
             }
@@ -1043,9 +1035,7 @@ class ReadAlongReader {
             doSeek();
         } else {
             this.audio.addEventListener('loadedmetadata', () => doSeek(), { once: true });
-            if (this.audio.readyState < 1) {
-                this.audio.load();
-            }
+            this.audio.load();
         }
     }
 
