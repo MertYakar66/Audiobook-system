@@ -100,7 +100,7 @@ class ReadAlongReader {
 
         // Book catalog for URL-based loading
         this.booksCatalog = {
-            'the-intelligent-investor': '../output/readalong/the-intelligent-investor'
+            'the-intelligent-investor': '../output/readalong/preface-to-the-fourth-edition-by-warren-e-buffett'
         };
 
         // Initialize
@@ -403,7 +403,7 @@ class ReadAlongReader {
         try {
             this.showLoading(true);
 
-            // Fetch manifest first (needed to know timing/text filenames)
+            // Fetch manifest first (small, needed to know filenames)
             const manifestResponse = await fetch(`${basePath}/manifest.json`);
             if (!manifestResponse.ok) throw new Error('Book not found');
             this.bookData = await manifestResponse.json();
@@ -411,27 +411,78 @@ class ReadAlongReader {
             // Store base path for audio files
             this.audioBasePath = basePath;
 
-            // Fetch timing, text, and pages data in PARALLEL
-            const [timingResult, textResult] = await Promise.all([
-                fetch(`${basePath}/${this.bookData.timing}`).then(r => r.ok ? r.json() : null).catch(() => null),
-                fetch(`${basePath}/${this.bookData.text}`).then(r => r.ok ? r.json() : null).catch(() => null),
-                this.loadPagesFromPath(basePath)
-            ]);
-
-            this.timingData = timingResult;
-            this.textData = textResult;
+            // Load text.json FIRST — it's what the user sees (prioritize LCP)
+            const textResponse = await fetch(`${basePath}/${this.bookData.text}`);
+            this.textData = textResponse.ok ? await textResponse.json() : null;
 
             // Load bookmarks and notes for this book
             this.loadBookData();
 
-            // Initialize reader
+            // Initialize reader with text immediately (timing loads in background)
+            // Create a minimal timing structure so initializeReader works
+            this.timingData = this._createMinimalTimingData();
             this.initializeReader();
+            this.showLoading(false);
+
+            // Load timing.json in the background (large file, not needed for initial render)
+            fetch(`${basePath}/${this.bookData.timing}`)
+                .then(r => r.ok ? r.json() : null)
+                .then(timingResult => {
+                    if (timingResult) {
+                        this.timingData = timingResult;
+                        console.log('[Reader] Timing data loaded in background:',
+                            timingResult.chapters.length, 'chapters');
+                        // Re-populate chapter select with real titles from timing data
+                        this._updateChapterSelect();
+                    }
+                })
+                .catch(err => console.warn('[Reader] Timing load failed:', err));
 
         } catch (error) {
             console.error('Error loading book:', error);
             this.showToast('Error loading book: ' + error.message);
             this.showLoading(false);
         }
+    }
+
+    /**
+     * Create minimal timing structure from text data for immediate rendering.
+     * This allows the reader to load and display text before timing.json arrives.
+     */
+    _createMinimalTimingData() {
+        if (!this.textData) return { chapters: [] };
+
+        return {
+            chapters: this.textData.chapters.map((ch, i) => ({
+                chapterId: ch.id || `ch${(i + 1).toString().padStart(2, '0')}`,
+                title: ch.title || `Chapter ${i + 1}`,
+                audioFile: `audio/ch${(i + 1).toString().padStart(2, '0')}.mp3`,
+                duration: 0,
+                entries: (ch.paragraphs || []).flatMap(p =>
+                    (p.sentences || []).map(s => ({
+                        id: s.id,
+                        text: s.text,
+                        start: 0,
+                        end: 0,
+                        paragraph: parseInt(p.id?.split('_p')[1]) || 0
+                    }))
+                )
+            }))
+        };
+    }
+
+    /**
+     * Update chapter select dropdown when real timing data loads.
+     */
+    _updateChapterSelect() {
+        this.chapterSelect.innerHTML = '';
+        this.timingData.chapters.forEach((chapter, index) => {
+            const option = document.createElement('option');
+            option.value = index;
+            option.textContent = chapter.title;
+            this.chapterSelect.appendChild(option);
+        });
+        this.chapterSelect.value = this.currentChapter;
     }
 
     /**
