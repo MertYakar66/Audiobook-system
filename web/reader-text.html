@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0d1117">
     <meta name="mobile-web-app-capable" content="yes">
     <title>Scriptum - Reader</title>
-    <link rel="stylesheet" href="reader-text.css">
+    <link rel="stylesheet" href="reader-text.css?v=2">
 </head>
 
 <body>
@@ -25,6 +25,30 @@
             </div>
             <div class="header-right">
                 <span class="page-indicator" id="page-indicator">0 / 0</span>
+
+                <!-- Highlight current page button -->
+                <button id="pdf-highlight-btn" class="header-btn" title="Mark this page">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                        <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                    </svg>
+                </button>
+
+                <!-- Add note button -->
+                <button id="pdf-note-btn" class="header-btn" title="Add note to this page">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="12" y1="11" x2="12" y2="17"/>
+                        <line x1="9" y1="14" x2="15" y2="14"/>
+                    </svg>
+                </button>
+
+                <!-- Sidebar toggle button -->
+                <button id="pdf-sidebar-btn" class="header-btn" title="Notes & Highlights">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                    </svg>
+                </button>
             </div>
         </header>
 
@@ -64,12 +88,84 @@
             </button>
         </footer>
 
+        <!-- Sidebar Panel -->
+        <div id="pdf-sidebar" class="pdf-sidebar">
+            <div class="pdf-sidebar-content">
+                <div class="pdf-sidebar-header">
+                    <h2>Notes & Highlights</h2>
+                    <button id="pdf-close-sidebar" class="pdf-close-btn">×</button>
+                </div>
+
+                <!-- Tabs -->
+                <div class="pdf-panel-tabs">
+                    <button class="pdf-panel-tab active" data-tab="pdf-highlights">Highlights</button>
+                    <button class="pdf-panel-tab" data-tab="pdf-notes">Notes</button>
+                </div>
+
+                <!-- Highlights tab -->
+                <div id="pdf-highlights-tab" class="pdf-tab-content active">
+                    <div id="pdf-highlights-list" class="pdf-list">
+                        <div class="pdf-empty-state">
+                            <p>No page marks yet</p>
+                            <span>Use the highlight button to mark the current page</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Notes tab -->
+                <div id="pdf-notes-tab" class="pdf-tab-content">
+                    <div id="pdf-notes-list" class="pdf-list">
+                        <div class="pdf-empty-state">
+                            <p>No notes yet</p>
+                            <span>Use the note button to add a note to the current page</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Export -->
+                <div class="pdf-sidebar-footer">
+                    <button id="pdf-export-btn" class="pdf-export-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="7 10 12 15 17 10" />
+                            <line x1="12" y1="15" x2="12" y2="3" />
+                        </svg>
+                        Export All
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Note Modal -->
+        <div id="pdf-notes-modal" class="pdf-modal">
+            <div class="pdf-modal-content">
+                <div class="pdf-modal-header">
+                    <h2>Add Note - Page <span id="pdf-note-page-num">1</span></h2>
+                    <button id="pdf-close-note-modal" class="pdf-close-btn">×</button>
+                </div>
+                <textarea id="pdf-note-input" class="pdf-note-textarea" placeholder="Write your note here..."></textarea>
+                <div class="pdf-modal-color-picker">
+                    <span class="pdf-color-label">Color:</span>
+                    <div class="pdf-color-options">
+                        <button class="pdf-color-pick-btn selected" data-color="yellow" style="background: #fff59d" title="Yellow"></button>
+                        <button class="pdf-color-pick-btn" data-color="green" style="background: #c8e6c9" title="Green"></button>
+                        <button class="pdf-color-pick-btn" data-color="blue" style="background: #bbdefb" title="Blue"></button>
+                        <button class="pdf-color-pick-btn" data-color="pink" style="background: #f8bbd9" title="Pink"></button>
+                        <button class="pdf-color-pick-btn" data-color="orange" style="background: #ffcc80" title="Orange"></button>
+                    </div>
+                </div>
+                <div class="pdf-modal-actions">
+                    <button id="pdf-save-note" class="pdf-primary-btn">Save Note</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Toast -->
         <div id="toast" class="toast"></div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs" type="module"></script>
-    <script src="reader-text.js" type="module"></script>
+    <script src="reader-text.js?v=2" type="module"></script>
 </body>
 
 </html>

@@ -55,6 +55,12 @@ body {
     min-width: 0;
 }
 
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
 .header-btn {
     display: flex;
     align-items: center;
@@ -119,12 +125,26 @@ body {
     box-shadow: var(--page-shadow);
     background: #fff;
     line-height: 0;
+    position: relative;
 }
 
 .page-wrapper canvas {
     display: block;
     max-width: 100%;
     height: auto;
+}
+
+/* Page annotation indicator (colored triangle on top-right) */
+.page-annotation-indicator {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 0;
+    height: 0;
+    border-left: 24px solid transparent;
+    border-top: 24px solid var(--indicator-color, #fff59d);
+    pointer-events: none;
+    z-index: 2;
 }
 
 /* ==================== BOTTOM CONTROLS ==================== */
@@ -262,6 +282,367 @@ body {
     transform: translateX(-50%) translateY(0);
 }
 
+/* ==================== SIDEBAR ==================== */
+
+.pdf-sidebar {
+    position: fixed;
+    top: 0;
+    right: -350px;
+    width: 350px;
+    height: 100%;
+    background: var(--bg);
+    border-left: 1px solid var(--border);
+    box-shadow: -2px 0 10px rgba(0, 0, 0, 0.3);
+    z-index: 200;
+    transition: right 0.3s ease;
+    overflow-y: auto;
+}
+
+.pdf-sidebar.open {
+    right: 0;
+}
+
+.pdf-sidebar-content {
+    padding: 1.25rem;
+}
+
+.pdf-sidebar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.pdf-sidebar-header h2 {
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.pdf-close-btn {
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: transparent;
+    font-size: 1.25rem;
+    cursor: pointer;
+    border-radius: 50%;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+}
+
+.pdf-close-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+/* Sidebar tabs */
+.pdf-panel-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 1rem;
+}
+
+.pdf-panel-tab {
+    flex: 1;
+    padding: 0.65rem 0.5rem;
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+}
+
+.pdf-panel-tab:hover {
+    color: var(--text);
+}
+
+.pdf-panel-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
+.pdf-tab-content {
+    display: none;
+}
+
+.pdf-tab-content.active {
+    display: block;
+}
+
+/* Tab badges */
+.pdf-tab-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    background: var(--accent);
+    color: white;
+    border-radius: 9px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    margin-left: 4px;
+    vertical-align: middle;
+}
+
+/* Annotation list */
+.pdf-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+/* Annotation cards */
+.pdf-annotation-card {
+    padding: 0.75rem;
+    background: var(--bg-header);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+}
+
+.pdf-annotation-card:hover {
+    background: var(--border);
+}
+
+.pdf-annotation-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.4rem;
+}
+
+.pdf-annotation-page {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--accent);
+}
+
+.pdf-annotation-color-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.pdf-annotation-note {
+    font-size: 0.85rem;
+    color: var(--text);
+    line-height: 1.4;
+    margin-bottom: 0.25rem;
+}
+
+.pdf-annotation-date {
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    margin-top: 0.4rem;
+}
+
+.pdf-annotation-delete {
+    position: absolute;
+    top: 0.4rem;
+    right: 0.4rem;
+    background: none;
+    border: none;
+    color: #e74c3c;
+    cursor: pointer;
+    font-size: 1.1rem;
+    line-height: 1;
+    opacity: 0;
+    transition: opacity 0.2s;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+.pdf-annotation-card:hover .pdf-annotation-delete {
+    opacity: 1;
+}
+
+.pdf-annotation-delete:hover {
+    background: rgba(231, 76, 60, 0.15);
+}
+
+/* Empty states */
+.pdf-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 2rem 1rem;
+    color: var(--text-dim);
+    text-align: center;
+}
+
+.pdf-empty-state svg {
+    opacity: 0.4;
+}
+
+.pdf-empty-state p {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.pdf-empty-state span {
+    font-size: 0.8rem;
+}
+
+/* Sidebar footer */
+.pdf-sidebar-footer {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+}
+
+.pdf-export-btn {
+    width: 100%;
+    padding: 0.65rem 1.5rem;
+    font-size: 0.85rem;
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    transition: all 0.2s;
+}
+
+.pdf-export-btn:hover {
+    background: var(--border);
+}
+
+/* ==================== NOTE MODAL ==================== */
+
+.pdf-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 300;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.pdf-modal.open {
+    display: flex;
+}
+
+.pdf-modal-content {
+    background: var(--bg);
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    max-width: 450px;
+    width: 100%;
+    border: 1px solid var(--border);
+}
+
+.pdf-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.pdf-modal-header h2 {
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.pdf-note-textarea {
+    width: calc(100% - 2.5rem);
+    margin: 1rem 1.25rem 0.75rem;
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-header);
+    color: var(--text);
+    font-size: 0.9rem;
+    font-family: inherit;
+    min-height: 100px;
+    resize: vertical;
+    outline: none;
+}
+
+.pdf-note-textarea:focus {
+    border-color: var(--accent);
+}
+
+.pdf-modal-color-picker {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0 1.25rem 0.75rem;
+}
+
+.pdf-color-label {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    white-space: nowrap;
+}
+
+.pdf-color-options {
+    display: flex;
+    gap: 6px;
+}
+
+.pdf-color-pick-btn {
+    width: 24px;
+    height: 24px;
+    border: 2px solid transparent;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.pdf-color-pick-btn:hover {
+    transform: scale(1.15);
+}
+
+.pdf-color-pick-btn.selected {
+    border-color: var(--text);
+    transform: scale(1.1);
+}
+
+.pdf-modal-actions {
+    padding: 0 1.25rem 1.25rem;
+}
+
+.pdf-primary-btn {
+    width: 100%;
+    padding: 0.75rem;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+
+.pdf-primary-btn:hover {
+    background: #5b4bd6;
+}
+
 /* ==================== RESPONSIVE ==================== */
 
 @media (max-width: 600px) {
@@ -272,5 +653,27 @@ body {
     .pages-container {
         padding: 8px 0 calc(var(--controls-height) + 8px);
         gap: 8px;
+    }
+
+    .pdf-sidebar {
+        width: 100%;
+        right: -100%;
+    }
+
+    .header h1 {
+        max-width: 120px;
+    }
+
+    .header-right {
+        gap: 2px;
+    }
+
+    .header-btn {
+        width: 30px;
+        height: 30px;
+    }
+
+    .pdf-modal-content {
+        max-height: 90vh;
     }
 }

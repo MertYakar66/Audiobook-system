@@ -9,7 +9,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <link rel="manifest" href="manifest.json">
     <title>Scriptum Reader</title>
-    <link rel="stylesheet" href="styles.css?v=4">
+    <link rel="stylesheet" href="styles.css?v=5">
 </head>
 
 <body>
@@ -278,6 +278,16 @@
                 </div>
                 <div class="selected-text-preview" id="selected-text-preview"></div>
                 <textarea id="note-input" placeholder="Write your note here..."></textarea>
+                <div class="modal-color-picker">
+                    <span class="color-picker-label">Highlight color:</span>
+                    <div class="color-picker-options">
+                        <button class="color-pick-btn selected" data-color="yellow" style="background: #fff59d" title="Yellow"></button>
+                        <button class="color-pick-btn" data-color="green" style="background: #c8e6c9" title="Green"></button>
+                        <button class="color-pick-btn" data-color="blue" style="background: #bbdefb" title="Blue"></button>
+                        <button class="color-pick-btn" data-color="pink" style="background: #f8bbd9" title="Pink"></button>
+                        <button class="color-pick-btn" data-color="orange" style="background: #ffcc80" title="Orange"></button>
+                    </div>
+                </div>
                 <div class="modal-actions">
                     <button id="save-note" class="primary-btn">Save Note</button>
                     <button id="highlight-only" class="secondary-btn">Highlight Only</button>
@@ -324,7 +334,7 @@
         <div id="toast" class="toast"></div>
     </div>
 
-    <script src="reader.js?v=5"></script>
+    <script src="reader.js?v=6"></script>
     <script>
         // Register service worker for offline support
         if ('serviceWorker' in navigator) {

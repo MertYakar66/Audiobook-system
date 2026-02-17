@@ -3,6 +3,7 @@
  *
  * Renders original PDF pages using PDF.js.
  * Shares reading progress with the Read & Listen reader.
+ * Page-level annotation system (notes + highlights).
  */
 
 // Book registry
@@ -22,6 +23,15 @@ const BOOK_SOURCES = {
 // PDF.js worker
 const PDFJS_CDN = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379";
 
+// Highlight colors
+const HIGHLIGHT_COLORS = [
+    { name: 'yellow', color: '#fff59d' },
+    { name: 'green', color: '#c8e6c9' },
+    { name: 'blue', color: '#bbdefb' },
+    { name: 'pink', color: '#f8bbd9' },
+    { name: 'orange', color: '#ffcc80' }
+];
+
 class PDFReader {
     constructor() {
         this.bookId = null;
@@ -33,6 +43,11 @@ class PDFReader {
         this.renderScale = 1.5;
         this.observer = null;
         this._scrollThrottleTimer = null;
+
+        // Annotations
+        this.notes = [];
+        this.highlights = [];
+        this.selectedColor = 'yellow';
 
         this.init();
     }
@@ -50,6 +65,7 @@ class PDFReader {
         document.getElementById('book-title').textContent = this.bookInfo.title;
         document.title = `${this.bookInfo.title} - Scriptum`;
 
+        this.loadAnnotations();
         this.bindEvents();
         await this.loadPDF();
     }
@@ -92,6 +108,9 @@ class PDFReader {
 
             // Scroll to saved page
             this.scrollToPage(this.currentPage);
+
+            // Apply page indicators for annotations
+            this._applyAllPageIndicators();
 
         } catch (e) {
             console.error('PDF load error:', e);
@@ -236,8 +255,6 @@ class PDFReader {
     // ==================== PROGRESS (shared with Read & Listen) ====================
 
     saveProgress() {
-        // Map page to approximate chapter for Read & Listen compatibility
-        // Store page number in position field for precise restore
         const progress = {
             bookId: this.bookId,
             chapter: 0,
@@ -264,9 +281,293 @@ class PDFReader {
         }
     }
 
+    // ==================== ANNOTATIONS ====================
+
+    loadAnnotations() {
+        try {
+            const saved = localStorage.getItem(`scriptum-pdf-annotations-${this.bookId}`);
+            if (saved) {
+                const data = JSON.parse(saved);
+                this.notes = data.notes || [];
+                this.highlights = data.highlights || [];
+            }
+        } catch (e) {
+            console.warn('Could not load annotations:', e);
+        }
+    }
+
+    saveAnnotations() {
+        const data = {
+            notes: this.notes,
+            highlights: this.highlights
+        };
+        localStorage.setItem(`scriptum-pdf-annotations-${this.bookId}`, JSON.stringify(data));
+    }
+
+    addPageHighlight(page, color) {
+        const highlight = {
+            id: Date.now().toString(),
+            bookId: this.bookId,
+            page: page,
+            color: color || this.selectedColor,
+            createdAt: new Date().toISOString()
+        };
+        this.highlights.push(highlight);
+        this.saveAnnotations();
+        this._applyPageIndicator(page);
+        this.renderHighlightsList();
+        this.showToast(`Page ${page} marked in ${highlight.color}`);
+    }
+
+    addPageNote(page, noteText, color) {
+        if (!noteText.trim()) return;
+        const note = {
+            id: Date.now().toString(),
+            bookId: this.bookId,
+            page: page,
+            note: noteText.trim(),
+            color: color || this.selectedColor,
+            createdAt: new Date().toISOString()
+        };
+        this.notes.push(note);
+        this.saveAnnotations();
+        this._applyPageIndicator(page);
+        this.renderNotesList();
+        this.showToast(`Note added to page ${page}`);
+    }
+
+    removeNote(id) {
+        const note = this.notes.find(n => n.id === id);
+        this.notes = this.notes.filter(n => n.id !== id);
+        this.saveAnnotations();
+        if (note) this._applyPageIndicator(note.page);
+        this.renderNotesList();
+        this.showToast('Note removed');
+    }
+
+    removeHighlight(id) {
+        const h = this.highlights.find(h => h.id === id);
+        this.highlights = this.highlights.filter(h => h.id !== id);
+        this.saveAnnotations();
+        if (h) this._applyPageIndicator(h.page);
+        this.renderHighlightsList();
+        this.showToast('Highlight removed');
+    }
+
+    _applyPageIndicator(page) {
+        const wrapper = document.getElementById(`page-${page}`);
+        if (!wrapper) return;
+
+        // Remove existing indicator
+        const existing = wrapper.querySelector('.page-annotation-indicator');
+        if (existing) existing.remove();
+
+        // Check if this page has any annotations
+        const pageNotes = this.notes.filter(n => n.page === page);
+        const pageHighlights = this.highlights.filter(h => h.page === page);
+        const total = pageNotes.length + pageHighlights.length;
+
+        if (total > 0) {
+            const color = pageHighlights.length > 0
+                ? (HIGHLIGHT_COLORS.find(c => c.name === pageHighlights[0].color)?.color || '#fff59d')
+                : '#6c5ce7';
+            const indicator = document.createElement('div');
+            indicator.className = 'page-annotation-indicator';
+            indicator.style.setProperty('--indicator-color', color);
+            indicator.title = `${total} annotation${total > 1 ? 's' : ''} on this page`;
+            wrapper.appendChild(indicator);
+        }
+    }
+
+    _applyAllPageIndicators() {
+        const pages = new Set();
+        this.notes.forEach(n => pages.add(n.page));
+        this.highlights.forEach(h => pages.add(h.page));
+        pages.forEach(p => this._applyPageIndicator(p));
+    }
+
+    renderNotesList() {
+        const container = document.getElementById('pdf-notes-list');
+        if (!container) return;
+
+        this._updatePdfTabBadges();
+
+        if (this.notes.length === 0) {
+            container.innerHTML = `
+                <div class="pdf-empty-state">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="36" height="36">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="16" y1="13" x2="8" y2="13"/>
+                        <line x1="16" y1="17" x2="8" y2="17"/>
+                    </svg>
+                    <p>No notes yet</p>
+                    <span>Use the note button to add a note to the current page</span>
+                </div>`;
+            return;
+        }
+
+        container.innerHTML = this.notes.map(n => {
+            const colorObj = HIGHLIGHT_COLORS.find(c => c.name === n.color) || HIGHLIGHT_COLORS[0];
+            const dateStr = this._formatDate(n.createdAt);
+            return `
+                <div class="pdf-annotation-card" data-id="${n.id}" style="border-left: 4px solid ${colorObj.color}">
+                    <button class="pdf-annotation-delete" onclick="event.stopPropagation(); pdfReader.removeNote('${n.id}')" title="Delete">×</button>
+                    <div class="pdf-annotation-meta">
+                        <span class="pdf-annotation-page">Page ${n.page}</span>
+                    </div>
+                    <div class="pdf-annotation-note">${n.note}</div>
+                    <div class="pdf-annotation-date">${dateStr}</div>
+                </div>`;
+        }).join('');
+
+        container.querySelectorAll('.pdf-annotation-card').forEach(item => {
+            item.addEventListener('click', () => {
+                const note = this.notes.find(n => n.id === item.dataset.id);
+                if (note) {
+                    this.goToPage(note.page);
+                    this.closeSidebar();
+                }
+            });
+        });
+    }
+
+    renderHighlightsList() {
+        const container = document.getElementById('pdf-highlights-list');
+        if (!container) return;
+
+        this._updatePdfTabBadges();
+
+        if (this.highlights.length === 0) {
+            container.innerHTML = `
+                <div class="pdf-empty-state">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="36" height="36">
+                        <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                    </svg>
+                    <p>No page marks yet</p>
+                    <span>Use the highlight button to mark the current page</span>
+                </div>`;
+            return;
+        }
+
+        container.innerHTML = this.highlights.map(h => {
+            const colorObj = HIGHLIGHT_COLORS.find(c => c.name === h.color) || HIGHLIGHT_COLORS[0];
+            const dateStr = this._formatDate(h.createdAt);
+            return `
+                <div class="pdf-annotation-card" data-id="${h.id}" style="border-left: 4px solid ${colorObj.color}">
+                    <button class="pdf-annotation-delete" onclick="event.stopPropagation(); pdfReader.removeHighlight('${h.id}')" title="Delete">×</button>
+                    <div class="pdf-annotation-meta">
+                        <span class="pdf-annotation-page">Page ${h.page}</span>
+                        <span class="pdf-annotation-color-dot" style="background: ${colorObj.color}"></span>
+                    </div>
+                    <div class="pdf-annotation-date">${dateStr}</div>
+                </div>`;
+        }).join('');
+
+        container.querySelectorAll('.pdf-annotation-card').forEach(item => {
+            item.addEventListener('click', () => {
+                const h = this.highlights.find(h => h.id === item.dataset.id);
+                if (h) {
+                    this.goToPage(h.page);
+                    this.closeSidebar();
+                }
+            });
+        });
+    }
+
+    _updatePdfTabBadges() {
+        const counts = {
+            'pdf-highlights': this.highlights.length,
+            'pdf-notes': this.notes.length
+        };
+        document.querySelectorAll('.pdf-panel-tab').forEach(tab => {
+            const name = tab.dataset.tab;
+            const count = counts[name] || 0;
+            let badge = tab.querySelector('.pdf-tab-badge');
+            if (count > 0) {
+                if (!badge) {
+                    badge = document.createElement('span');
+                    badge.className = 'pdf-tab-badge';
+                    tab.appendChild(badge);
+                }
+                badge.textContent = count;
+            } else if (badge) {
+                badge.remove();
+            }
+        });
+    }
+
+    exportAnnotations() {
+        let content = `# Annotations\n\n`;
+        content += `**${this.bookInfo.title}**\n`;
+        content += `*By ${this.bookInfo.author}*\n\n`;
+        content += `Exported: ${this._formatDate(new Date().toISOString())}\n\n---\n\n`;
+
+        if (this.highlights.length > 0) {
+            content += `## Page Marks (${this.highlights.length})\n\n`;
+            this.highlights.forEach((h, i) => {
+                content += `${i + 1}. Page ${h.page} (${h.color}) - ${this._formatDate(h.createdAt)}\n`;
+            });
+            content += '\n';
+        }
+
+        if (this.notes.length > 0) {
+            content += `## Notes (${this.notes.length})\n\n`;
+            this.notes.forEach((n, i) => {
+                content += `${i + 1}. **Page ${n.page}:** ${n.note}\n`;
+                content += `   *${this._formatDate(n.createdAt)}*\n\n`;
+            });
+        }
+
+        const blob = new Blob([content], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${this.bookInfo.title.replace(/[^a-z0-9]/gi, '_')}_annotations.md`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        this.showToast('Annotations exported');
+    }
+
+    _formatDate(isoString) {
+        try {
+            const d = new Date(isoString);
+            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) +
+                ' at ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+        } catch {
+            return isoString;
+        }
+    }
+
+    // ==================== SIDEBAR ====================
+
+    openSidebar() {
+        document.getElementById('pdf-sidebar').classList.add('open');
+        this.renderNotesList();
+        this.renderHighlightsList();
+    }
+
+    closeSidebar() {
+        document.getElementById('pdf-sidebar').classList.remove('open');
+    }
+
+    openNoteModal() {
+        document.getElementById('pdf-note-page-num').textContent = this.currentPage;
+        document.getElementById('pdf-note-input').value = '';
+        document.getElementById('pdf-notes-modal').classList.add('open');
+        document.getElementById('pdf-note-input').focus();
+    }
+
+    closeNoteModal() {
+        document.getElementById('pdf-notes-modal').classList.remove('open');
+    }
+
     // ==================== EVENTS ====================
 
     bindEvents() {
+        // Page navigation
         document.getElementById('prev-page').addEventListener('click', () => {
             this.goToPage(this.currentPage - 1);
         });
@@ -284,8 +585,78 @@ class PDFReader {
             this.goToPage(parseInt(e.target.value));
         });
 
+        // Annotation buttons in header
+        document.getElementById('pdf-sidebar-btn')?.addEventListener('click', () => {
+            this.openSidebar();
+        });
+
+        document.getElementById('pdf-highlight-btn')?.addEventListener('click', () => {
+            this.addPageHighlight(this.currentPage, this.selectedColor);
+        });
+
+        document.getElementById('pdf-note-btn')?.addEventListener('click', () => {
+            this.openNoteModal();
+        });
+
+        // Sidebar
+        document.getElementById('pdf-close-sidebar')?.addEventListener('click', () => {
+            this.closeSidebar();
+        });
+
+        // Sidebar tabs
+        document.querySelectorAll('.pdf-panel-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.pdf-panel-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                const tabName = tab.dataset.tab;
+                document.querySelectorAll('.pdf-tab-content').forEach(c => c.classList.remove('active'));
+                document.getElementById(`${tabName}-tab`)?.classList.add('active');
+            });
+        });
+
+        // Export
+        document.getElementById('pdf-export-btn')?.addEventListener('click', () => {
+            this.exportAnnotations();
+        });
+
+        // Note modal
+        document.getElementById('pdf-close-note-modal')?.addEventListener('click', () => {
+            this.closeNoteModal();
+        });
+
+        document.getElementById('pdf-save-note')?.addEventListener('click', () => {
+            const text = document.getElementById('pdf-note-input').value;
+            this.addPageNote(this.currentPage, text, this.selectedColor);
+            this.closeNoteModal();
+        });
+
+        // Modal color picker
+        document.querySelectorAll('.pdf-color-pick-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.pdf-color-pick-btn').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+                this.selectedColor = btn.dataset.color;
+            });
+        });
+
+        // Close modal on backdrop
+        document.querySelectorAll('.pdf-modal').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) modal.classList.remove('open');
+            });
+        });
+
+        // Close sidebar on outside click
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.pdf-sidebar') && !e.target.closest('#pdf-sidebar-btn')) {
+                this.closeSidebar();
+            }
+        });
+
         // Keyboard
         document.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
             if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
                 e.preventDefault();
                 this.goToPage(this.currentPage - 1);
