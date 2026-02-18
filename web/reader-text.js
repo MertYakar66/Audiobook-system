@@ -3,9 +3,10 @@
  *
  * Renders structured text from text.json with:
  * - Chapter navigation
- * - Text selection with floating toolbar
+ * - Tool-first annotation: pick a tool, then click sentences
  * - Multi-color sentence highlighting
  * - Notes on selected text
+ * - Eraser tool to remove highlights
  * - Persistent annotations (localStorage)
  * - Progress tracking (chapter + scroll)
  * - Export annotations as markdown
@@ -25,7 +26,7 @@ const BOOK_SOURCES = {
     }
 };
 
-// Highlight colors (shared with Read & Listen reader)
+// Highlight colors
 const HIGHLIGHT_COLORS = [
     { name: 'yellow', color: '#fff59d' },
     { name: 'green', color: '#c8e6c9' },
@@ -46,16 +47,14 @@ class TextReader {
         this.notes = [];
         this.selectedHighlightColor = 'yellow';
 
-        // Selection state
-        this.selectedText = null;
-        this.selectedSentenceId = null;
-        this.selectionToolbar = null;
+        // Active tool: null, 'highlight', 'note', 'eraser'
+        this.activeTool = null;
 
         this.init();
     }
 
     async init() {
-        const params = new URLSearchParams(window.location.search);
+        var params = new URLSearchParams(window.location.search);
         this.bookId = params.get('book');
 
         if (!this.bookId || !BOOK_SOURCES[this.bookId]) {
@@ -68,7 +67,6 @@ class TextReader {
         document.title = this.bookInfo.title + ' - Scriptum';
 
         this.loadAnnotations();
-        this.createSelectionToolbar();
         this.bindEvents();
         await this.loadBook();
     }
@@ -77,14 +75,14 @@ class TextReader {
 
     async loadBook() {
         try {
-            const resp = await fetch(this.bookInfo.textPath + '/text.json');
+            var resp = await fetch(this.bookInfo.textPath + '/text.json');
             if (!resp.ok) throw new Error('Could not load text data');
             this.textData = await resp.json();
 
             // Populate chapter selector
-            const select = document.getElementById('chapter-select');
-            this.textData.chapters.forEach((ch, i) => {
-                const opt = document.createElement('option');
+            var select = document.getElementById('chapter-select');
+            this.textData.chapters.forEach(function(ch, i) {
+                var opt = document.createElement('option');
                 opt.value = i;
                 opt.textContent = ch.title || ('Chapter ' + (i + 1));
                 select.appendChild(opt);
@@ -95,7 +93,7 @@ class TextReader {
             document.getElementById('text-content').style.display = 'block';
 
             // Restore saved progress or load first chapter
-            const saved = this.restoreProgress();
+            var saved = this.restoreProgress();
             if (saved && saved.chapter < this.textData.chapters.length) {
                 this.loadChapter(saved.chapter, saved.scrollTop);
             } else {
@@ -114,7 +112,7 @@ class TextReader {
         if (!this.textData || index < 0 || index >= this.textData.chapters.length) return;
 
         this.currentChapter = index;
-        const chapter = this.textData.chapters[index];
+        var chapter = this.textData.chapters[index];
 
         // Update nav
         document.getElementById('chapter-select').value = index;
@@ -122,39 +120,39 @@ class TextReader {
         document.getElementById('next-chapter').disabled = index === this.textData.chapters.length - 1;
 
         // Build lookup maps for annotations
-        const highlightMap = new Map();
-        for (const h of this.highlights) {
+        var highlightMap = new Map();
+        for (var h of this.highlights) {
             if (h.chapter === index) highlightMap.set(h.sentenceId, h);
         }
-        const noteMap = new Map();
-        for (const n of this.notes) {
+        var noteMap = new Map();
+        for (var n of this.notes) {
             if (n.chapter === index) noteMap.set(n.sentenceId, n);
         }
-        const colorMap = new Map();
-        for (const c of HIGHLIGHT_COLORS) {
+        var colorMap = new Map();
+        for (var c of HIGHLIGHT_COLORS) {
             colorMap.set(c.name, c.color);
         }
 
         // Build DOM
-        const fragment = document.createDocumentFragment();
+        var fragment = document.createDocumentFragment();
 
-        chapter.paragraphs.forEach(paragraph => {
-            const pEl = document.createElement('p');
+        chapter.paragraphs.forEach(function(paragraph) {
+            var pEl = document.createElement('p');
             pEl.className = 'paragraph';
             pEl.dataset.id = paragraph.id;
 
-            paragraph.sentences.forEach(sentence => {
-                const span = document.createElement('span');
+            paragraph.sentences.forEach(function(sentence) {
+                var span = document.createElement('span');
                 span.className = 'sentence';
                 span.dataset.id = sentence.id;
                 span.textContent = sentence.text + ' ';
 
                 // Apply saved highlight
-                const hl = highlightMap.get(sentence.id);
+                var hl = highlightMap.get(sentence.id);
                 if (hl) {
                     span.classList.add('highlighted');
                     span.dataset.highlightColor = hl.color;
-                    const bgColor = colorMap.get(hl.color);
+                    var bgColor = colorMap.get(hl.color);
                     if (bgColor) span.style.backgroundColor = bgColor;
                 }
 
@@ -169,197 +167,123 @@ class TextReader {
             fragment.appendChild(pEl);
         });
 
-        const textContent = document.getElementById('text-content');
+        var textContent = document.getElementById('text-content');
         textContent.innerHTML = '';
         textContent.appendChild(fragment);
 
         // Scroll to saved position or top
-        const content = document.getElementById('content');
+        var content = document.getElementById('content');
         if (scrollTop && scrollTop > 0) {
-            requestAnimationFrame(() => { content.scrollTop = scrollTop; });
+            requestAnimationFrame(function() { content.scrollTop = scrollTop; });
         } else {
             content.scrollTop = 0;
         }
 
-        this.hideSelectionToolbar();
         this.saveProgress();
     }
 
-    // ==================== SELECTION TOOLBAR ====================
+    // ==================== TOOL MANAGEMENT ====================
 
-    createSelectionToolbar() {
-        const toolbar = document.createElement('div');
-        toolbar.id = 'selection-toolbar';
-        toolbar.className = 'selection-toolbar';
-        toolbar.innerHTML =
-            '<div class="toolbar-colors">' +
-            HIGHLIGHT_COLORS.map(c =>
-                '<button class="color-btn" data-color="' + c.name + '" style="background: ' + c.color + '" title="' + c.name + '"></button>'
-            ).join('') +
-            '</div>' +
-            '<div class="toolbar-actions">' +
-            '<button class="toolbar-btn" id="toolbar-highlight" title="Highlight">' +
-            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>' +
-            '</button>' +
-            '<button class="toolbar-btn" id="toolbar-note" title="Add Note">' +
-            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>' +
-            '</button>' +
-            '<button class="toolbar-btn" id="toolbar-copy" title="Copy">' +
-            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>' +
-            '</button>' +
-            '</div>';
-        document.body.appendChild(toolbar);
-        this.selectionToolbar = toolbar;
-
-        // Color buttons
-        toolbar.querySelectorAll('.color-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.selectedHighlightColor = btn.dataset.color;
-                toolbar.querySelectorAll('.color-btn').forEach(b => b.classList.remove('selected'));
-                btn.classList.add('selected');
-            });
-        });
-        // Set default color
-        toolbar.querySelector('.color-btn[data-color="yellow"]').classList.add('selected');
-
-        // Action buttons
-        document.getElementById('toolbar-highlight').addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.addHighlightFromToolbar();
-        });
-        document.getElementById('toolbar-note').addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.hideSelectionToolbar();
-            if (this.selectedText) this.openNoteModal();
-        });
-        document.getElementById('toolbar-copy').addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.copySelectedText();
-        });
-    }
-
-    showSelectionToolbar(x, y) {
-        const toolbar = this.selectionToolbar;
-        const toolbarWidth = 220;
-        const toolbarHeight = 80;
-
-        let posX = x - toolbarWidth / 2;
-        let posY = y - toolbarHeight - 10;
-
-        posX = Math.max(10, Math.min(posX, window.innerWidth - toolbarWidth - 10));
-        posY = Math.max(10, posY);
-
-        if (posY < 10) posY = y + 20;
-
-        toolbar.style.left = posX + 'px';
-        toolbar.style.top = posY + 'px';
-        toolbar.classList.add('visible');
-    }
-
-    hideSelectionToolbar() {
-        if (this.selectionToolbar) {
-            this.selectionToolbar.classList.remove('visible');
-        }
-    }
-
-    // ==================== TEXT SELECTION ====================
-
-    handleTextSelection() {
-        const selection = window.getSelection();
-        const text = selection.toString().trim();
-
-        if (text.length > 0) {
-            // Find the sentence element
-            let node = selection.anchorNode;
-            while (node && !node.classList?.contains('sentence')) {
-                node = node.parentNode;
-            }
-
-            if (node && node.classList?.contains('sentence')) {
-                this.selectedText = text;
-                this.selectedSentenceId = node.dataset.id;
-
-                const range = selection.getRangeAt(0);
-                const rect = range.getBoundingClientRect();
-                this.showSelectionToolbar(rect.left + rect.width / 2, rect.top);
-            }
+    setActiveTool(toolName) {
+        // Toggle off if same tool clicked again
+        if (this.activeTool === toolName) {
+            this.activeTool = null;
         } else {
-            setTimeout(() => {
-                if (!window.getSelection().toString().trim()) {
-                    this.hideSelectionToolbar();
-                }
-            }, 100);
+            this.activeTool = toolName;
+        }
+
+        // Update button states
+        document.querySelectorAll('.tool-btn').forEach(function(btn) {
+            btn.classList.remove('active');
+        });
+        if (this.activeTool) {
+            var activeBtn = document.getElementById('tool-' + this.activeTool);
+            if (activeBtn) activeBtn.classList.add('active');
+        }
+
+        // Update body class for cursor
+        document.body.classList.remove('tool-highlight', 'tool-note', 'tool-eraser');
+        if (this.activeTool) {
+            document.body.classList.add('tool-' + this.activeTool);
         }
     }
 
-    async copySelectedText() {
-        if (this.selectedText) {
-            try {
-                await navigator.clipboard.writeText(this.selectedText);
-                this.showToast('Copied to clipboard');
-            } catch (err) {
-                const textarea = document.createElement('textarea');
-                textarea.value = this.selectedText;
-                document.body.appendChild(textarea);
-                textarea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textarea);
-                this.showToast('Copied to clipboard');
-            }
+    handleSentenceClick(sentenceEl) {
+        if (!this.activeTool) return;
+
+        var sentenceId = sentenceEl.dataset.id;
+        var sentenceText = sentenceEl.textContent.trim();
+
+        if (this.activeTool === 'highlight') {
+            this.addHighlight(sentenceId, sentenceText, sentenceEl);
+        } else if (this.activeTool === 'note') {
+            this.openNoteModal(sentenceId, sentenceText);
+        } else if (this.activeTool === 'eraser') {
+            this.eraseHighlight(sentenceId, sentenceEl);
         }
-        this.hideSelectionToolbar();
-        window.getSelection().removeAllRanges();
     }
 
     // ==================== HIGHLIGHTING ====================
 
-    addHighlightFromToolbar() {
-        if (!this.selectedSentenceId) return;
-
-        const chapter = this.textData.chapters[this.currentChapter];
-        const highlight = {
+    addHighlight(sentenceId, sentenceText, el) {
+        var chapter = this.textData.chapters[this.currentChapter];
+        var highlight = {
             id: Date.now().toString(),
             bookId: this.bookId,
             chapter: this.currentChapter,
             chapterTitle: chapter.title || ('Chapter ' + (this.currentChapter + 1)),
-            sentenceId: this.selectedSentenceId,
-            text: this.selectedText,
+            sentenceId: sentenceId,
+            text: sentenceText,
             color: this.selectedHighlightColor,
             createdAt: new Date().toISOString()
         };
 
-        // Remove existing highlight on same sentence (replace)
-        this.highlights = this.highlights.filter(h => h.sentenceId !== this.selectedSentenceId);
+        // Remove existing highlight on same sentence (replace with new color)
+        this.highlights = this.highlights.filter(function(h) { return h.sentenceId !== sentenceId; });
         this.highlights.push(highlight);
         this.saveAnnotations();
-        this.hideSelectionToolbar();
         this.renderHighlightsList();
 
         // Apply to DOM
-        const el = document.querySelector('[data-id="' + this.selectedSentenceId + '"]');
-        if (el) {
-            el.classList.add('highlighted');
-            el.dataset.highlightColor = this.selectedHighlightColor;
-            const colorObj = HIGHLIGHT_COLORS.find(c => c.name === this.selectedHighlightColor);
-            if (colorObj) el.style.backgroundColor = colorObj.color;
-        }
+        el.classList.add('highlighted');
+        el.dataset.highlightColor = this.selectedHighlightColor;
+        var colorObj = HIGHLIGHT_COLORS.find(function(c) { return c.name === highlight.color; });
+        if (colorObj) el.style.backgroundColor = colorObj.color;
 
-        window.getSelection().removeAllRanges();
+        // Flash feedback
+        el.classList.add('flash');
+        setTimeout(function() { el.classList.remove('flash'); }, 900);
         this.showToast('Highlighted in ' + this.selectedHighlightColor);
     }
 
+    eraseHighlight(sentenceId, el) {
+        var existing = this.highlights.find(function(h) { return h.sentenceId === sentenceId; });
+        if (!existing) {
+            this.showToast('No highlight to remove');
+            return;
+        }
+
+        el.classList.remove('highlighted');
+        el.style.backgroundColor = '';
+        delete el.dataset.highlightColor;
+
+        this.highlights = this.highlights.filter(function(h) { return h.sentenceId !== sentenceId; });
+        this.saveAnnotations();
+        this.renderHighlightsList();
+        this.showToast('Highlight removed');
+    }
+
     removeHighlight(id) {
-        const highlight = this.highlights.find(h => h.id === id);
+        var highlight = this.highlights.find(function(h) { return h.id === id; });
         if (highlight) {
-            const el = document.querySelector('[data-id="' + highlight.sentenceId + '"]');
+            var el = document.querySelector('[data-id="' + highlight.sentenceId + '"]');
             if (el) {
                 el.classList.remove('highlighted');
                 el.style.backgroundColor = '';
                 delete el.dataset.highlightColor;
             }
         }
-        this.highlights = this.highlights.filter(h => h.id !== id);
+        this.highlights = this.highlights.filter(function(h) { return h.id !== id; });
         this.saveAnnotations();
         this.renderHighlightsList();
         this.showToast('Highlight removed');
@@ -367,8 +291,10 @@ class TextReader {
 
     // ==================== NOTES ====================
 
-    openNoteModal() {
-        document.getElementById('selected-text-preview').textContent = '"' + this.selectedText + '"';
+    openNoteModal(sentenceId, sentenceText) {
+        this._pendingNoteSentenceId = sentenceId;
+        this._pendingNoteSentenceText = sentenceText;
+        document.getElementById('selected-text-preview').textContent = '"' + sentenceText + '"';
         document.getElementById('note-input').value = '';
         document.getElementById('note-modal').classList.add('open');
         document.getElementById('note-input').focus();
@@ -376,12 +302,16 @@ class TextReader {
 
     closeNoteModal() {
         document.getElementById('note-modal').classList.remove('open');
-        window.getSelection().removeAllRanges();
+        this._pendingNoteSentenceId = null;
+        this._pendingNoteSentenceText = null;
     }
 
     saveNote() {
         var noteText = document.getElementById('note-input').value.trim();
-        if (!noteText && !this.selectedText) return;
+        if (!noteText && !this._pendingNoteSentenceText) return;
+
+        var sentenceId = this._pendingNoteSentenceId;
+        var selectedText = this._pendingNoteSentenceText;
 
         var chapter = this.textData.chapters[this.currentChapter];
         var note = {
@@ -389,8 +319,8 @@ class TextReader {
             bookId: this.bookId,
             chapter: this.currentChapter,
             chapterTitle: chapter.title || ('Chapter ' + (this.currentChapter + 1)),
-            sentenceId: this.selectedSentenceId,
-            selectedText: this.selectedText,
+            sentenceId: sentenceId,
+            selectedText: selectedText,
             note: noteText,
             color: this.selectedHighlightColor,
             createdAt: new Date().toISOString()
@@ -402,14 +332,20 @@ class TextReader {
         this.closeNoteModal();
 
         // Mark sentence
-        var el = document.querySelector('[data-id="' + this.selectedSentenceId + '"]');
+        var el = document.querySelector('[data-id="' + sentenceId + '"]');
         if (el) el.classList.add('has-note');
 
         this.showToast('Note saved');
     }
 
     addHighlightOnly() {
-        this.addHighlightFromToolbar();
+        // Highlight the sentence from the note modal context
+        if (this._pendingNoteSentenceId) {
+            var el = document.querySelector('[data-id="' + this._pendingNoteSentenceId + '"]');
+            if (el) {
+                this.addHighlight(this._pendingNoteSentenceId, this._pendingNoteSentenceText, el);
+            }
+        }
         this.closeNoteModal();
     }
 
@@ -444,7 +380,7 @@ class TextReader {
         if (!container) return;
 
         this._updateTabBadges();
-        var bookHighlights = this.highlights.filter(h => h.bookId === this.bookId);
+        var bookHighlights = this.highlights.filter(function(h) { return h.bookId === this.bookId; }.bind(this));
 
         if (bookHighlights.length === 0) {
             container.innerHTML =
@@ -453,13 +389,13 @@ class TextReader {
                 '<path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>' +
                 '</svg>' +
                 '<p>No highlights yet</p>' +
-                '<span>Select text and pick a color to highlight</span>' +
+                '<span>Use the toolbar above, then click sentences</span>' +
                 '</div>';
             return;
         }
 
-        container.innerHTML = bookHighlights.map(h => {
-            var colorObj = HIGHLIGHT_COLORS.find(c => c.name === h.color) || HIGHLIGHT_COLORS[0];
+        container.innerHTML = bookHighlights.map(function(h) {
+            var colorObj = HIGHLIGHT_COLORS.find(function(c) { return c.name === h.color; }) || HIGHLIGHT_COLORS[0];
             var dateStr = this._formatDate(h.createdAt);
             var chTitle = h.chapterTitle || ('Chapter ' + (h.chapter + 1));
             var textPreview = h.text.length > 150 ? h.text.substring(0, 150) + '...' : h.text;
@@ -469,12 +405,13 @@ class TextReader {
                 '<div class="annotation-quote" style="background: ' + colorObj.color + '; color: #1a1a2e;">"' + this._escapeHtml(textPreview) + '"</div>' +
                 '<div class="annotation-date">' + dateStr + '</div>' +
                 '</div>';
-        }).join('');
+        }.bind(this)).join('');
 
-        container.querySelectorAll('.annotation-card').forEach(item => {
-            item.addEventListener('click', () => {
-                var h = this.highlights.find(h => h.id === item.dataset.id);
-                if (h) this._goToAnnotation(h.chapter, h.sentenceId);
+        var self = this;
+        container.querySelectorAll('.annotation-card').forEach(function(item) {
+            item.addEventListener('click', function() {
+                var h = self.highlights.find(function(h) { return h.id === item.dataset.id; });
+                if (h) self._goToAnnotation(h.chapter, h.sentenceId);
             });
         });
     }
@@ -484,7 +421,7 @@ class TextReader {
         if (!container) return;
 
         this._updateTabBadges();
-        var bookNotes = this.notes.filter(n => n.bookId === this.bookId);
+        var bookNotes = this.notes.filter(function(n) { return n.bookId === this.bookId; }.bind(this));
 
         if (bookNotes.length === 0) {
             container.innerHTML =
@@ -494,13 +431,13 @@ class TextReader {
                 '<polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>' +
                 '</svg>' +
                 '<p>No notes yet</p>' +
-                '<span>Select text and tap the note icon to add one</span>' +
+                '<span>Use the Note tool, then click a sentence</span>' +
                 '</div>';
             return;
         }
 
-        container.innerHTML = bookNotes.map(n => {
-            var colorObj = HIGHLIGHT_COLORS.find(c => c.name === n.color) || HIGHLIGHT_COLORS[0];
+        container.innerHTML = bookNotes.map(function(n) {
+            var colorObj = HIGHLIGHT_COLORS.find(function(c) { return c.name === n.color; }) || HIGHLIGHT_COLORS[0];
             var dateStr = this._formatDate(n.createdAt);
             var chTitle = n.chapterTitle || ('Chapter ' + (n.chapter + 1));
             var textPreview = n.selectedText.length > 150 ? n.selectedText.substring(0, 150) + '...' : n.selectedText;
@@ -511,12 +448,13 @@ class TextReader {
                 '<div class="annotation-note-text">' + this._escapeHtml(n.note) + '</div>' +
                 '<div class="annotation-date">' + dateStr + '</div>' +
                 '</div>';
-        }).join('');
+        }.bind(this)).join('');
 
-        container.querySelectorAll('.annotation-card').forEach(item => {
-            item.addEventListener('click', () => {
-                var n = this.notes.find(n => n.id === item.dataset.id);
-                if (n) this._goToAnnotation(n.chapter, n.sentenceId);
+        var self = this;
+        container.querySelectorAll('.annotation-card').forEach(function(item) {
+            item.addEventListener('click', function() {
+                var n = self.notes.find(function(n) { return n.id === item.dataset.id; });
+                if (n) self._goToAnnotation(n.chapter, n.sentenceId);
             });
         });
     }
@@ -526,22 +464,23 @@ class TextReader {
             this.loadChapter(chapter);
         }
         this.closeSidebar();
-        setTimeout(() => {
+        setTimeout(function() {
             var el = document.querySelector('[data-id="' + sentenceId + '"]');
             if (el) {
                 el.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 el.classList.add('flash');
-                setTimeout(() => el.classList.remove('flash'), 1500);
+                setTimeout(function() { el.classList.remove('flash'); }, 1500);
             }
         }, 300);
     }
 
     _updateTabBadges() {
+        var self = this;
         var counts = {
-            highlights: this.highlights.filter(h => h.bookId === this.bookId).length,
-            notes: this.notes.filter(n => n.bookId === this.bookId).length
+            highlights: this.highlights.filter(function(h) { return h.bookId === self.bookId; }).length,
+            notes: this.notes.filter(function(n) { return n.bookId === self.bookId; }).length
         };
-        document.querySelectorAll('.panel-tab').forEach(tab => {
+        document.querySelectorAll('.panel-tab').forEach(function(tab) {
             var name = tab.dataset.tab;
             var count = counts[name] || 0;
             var badge = tab.querySelector('.tab-badge');
@@ -566,26 +505,26 @@ class TextReader {
         content += '*By ' + this.bookInfo.author + '*\n\n';
         content += 'Exported: ' + this._formatDate(new Date().toISOString()) + '\n\n---\n\n';
 
-        var bookHighlights = this.highlights.filter(h => h.bookId === this.bookId);
-        var bookNotes = this.notes.filter(n => n.bookId === this.bookId);
+        var bookHighlights = this.highlights.filter(function(h) { return h.bookId === this.bookId; }.bind(this));
+        var bookNotes = this.notes.filter(function(n) { return n.bookId === this.bookId; }.bind(this));
 
         if (bookHighlights.length > 0) {
             content += '## Highlights (' + bookHighlights.length + ')\n\n';
-            bookHighlights.forEach((h, i) => {
+            bookHighlights.forEach(function(h, i) {
                 var chTitle = h.chapterTitle || ('Chapter ' + (h.chapter + 1));
                 content += (i + 1) + '. > "' + h.text + '"\n\n';
                 content += '   *' + chTitle + ' | ' + this._formatDate(h.createdAt) + '*\n\n';
-            });
+            }.bind(this));
         }
 
         if (bookNotes.length > 0) {
             content += '## Notes (' + bookNotes.length + ')\n\n';
-            bookNotes.forEach((n, i) => {
+            bookNotes.forEach(function(n, i) {
                 var chTitle = n.chapterTitle || ('Chapter ' + (n.chapter + 1));
                 content += (i + 1) + '. > "' + n.selectedText + '"\n\n';
                 content += '   **Note:** ' + n.note + '\n\n';
                 content += '   *' + chTitle + ' | ' + this._formatDate(n.createdAt) + '*\n\n';
-            });
+            }.bind(this));
         }
 
         var blob = new Blob([content], { type: 'text/markdown' });
@@ -663,17 +602,32 @@ class TextReader {
             }
         });
 
-        // Text selection
-        document.addEventListener('mouseup', function(e) {
-            if (e.target.closest('.text-content')) {
-                self.handleTextSelection();
-            }
+        // Tool buttons
+        document.querySelectorAll('.tool-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                self.setActiveTool(btn.dataset.tool);
+            });
         });
 
-        // Hide toolbar on outside click
-        document.addEventListener('click', function(e) {
-            if (!e.target.closest('.selection-toolbar') && !e.target.closest('.sentence')) {
-                self.hideSelectionToolbar();
+        // Color buttons in toolbar
+        document.querySelectorAll('.tool-color').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                self.selectedHighlightColor = btn.dataset.color;
+                document.querySelectorAll('.tool-color').forEach(function(b) { b.classList.remove('selected'); });
+                btn.classList.add('selected');
+                // Also update the modal color picker
+                document.querySelectorAll('.color-pick-btn').forEach(function(b) { b.classList.remove('selected'); });
+                var modalBtn = document.querySelector('.color-pick-btn[data-color="' + btn.dataset.color + '"]');
+                if (modalBtn) modalBtn.classList.add('selected');
+            });
+        });
+
+        // Sentence clicks (tool-first pattern)
+        document.getElementById('text-content').addEventListener('click', function(e) {
+            var sentenceEl = e.target.closest('.sentence');
+            if (sentenceEl && self.activeTool) {
+                e.preventDefault();
+                self.handleSentenceClick(sentenceEl);
             }
         });
 
@@ -722,6 +676,10 @@ class TextReader {
                 document.querySelectorAll('.color-pick-btn').forEach(function(b) { b.classList.remove('selected'); });
                 btn.classList.add('selected');
                 self.selectedHighlightColor = btn.dataset.color;
+                // Sync toolbar colors
+                document.querySelectorAll('.tool-color').forEach(function(b) { b.classList.remove('selected'); });
+                var toolBtn = document.querySelector('.tool-color[data-color="' + btn.dataset.color + '"]');
+                if (toolBtn) toolBtn.classList.add('selected');
             });
         });
 
@@ -743,6 +701,13 @@ class TextReader {
         document.addEventListener('keydown', function(e) {
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
 
+            // Escape to deactivate tool
+            if (e.key === 'Escape') {
+                self.setActiveTool(null);
+                self.activeTool = null;
+                return;
+            }
+
             if (e.key === 'ArrowLeft') {
                 if (self.currentChapter > 0) self.loadChapter(self.currentChapter - 1);
             } else if (e.key === 'ArrowRight') {
@@ -750,6 +715,11 @@ class TextReader {
                     self.loadChapter(self.currentChapter + 1);
                 }
             }
+
+            // Tool shortcuts: h = highlight, n = note, e = eraser
+            if (e.key === 'h') self.setActiveTool('highlight');
+            else if (e.key === 'n') self.setActiveTool('note');
+            else if (e.key === 'e') self.setActiveTool('eraser');
         });
     }
 

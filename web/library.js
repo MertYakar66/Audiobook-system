@@ -9,13 +9,13 @@
 const READ_LISTEN_BOOKS = [
     {
         id: "the-intelligent-investor",
-        path: "../output/readalong/preface-to-the-fourth-edition-by-warren-e-buffett",
+        path: "../output/readalong/the-intelligent-investor",
         title: "The Intelligent Investor",
         author: "Benjamin Graham",
-        cover: "../output/readalong/preface-to-the-fourth-edition-by-warren-e-buffett/cover.jpg",
+        cover: "../input/intelligentcover.jpg",
         sourceFile: "../input/DOCXs/The_Intelligent_Investor_TTSCleaned.docx",
         totalDuration: 90795,
-        chapterCount: 46,
+        chapterCount: 21,
         addedDate: "2025-02-05"
     }
 ];
@@ -26,6 +26,7 @@ const READ_ONLY_BOOKS = [
         id: "the-intelligent-investor-text",
         title: "The Intelligent Investor",
         author: "Benjamin Graham",
+        cover: "../input/intelligentcover.jpg",
         sourceFile: "../input/DOCXs/The Intelligent Investor.docx",
         addedDate: "2025-02-05"
     }

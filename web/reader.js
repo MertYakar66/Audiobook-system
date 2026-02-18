@@ -100,7 +100,7 @@ class ReadAlongReader {
 
         // Book catalog for URL-based loading
         this.booksCatalog = {
-            'the-intelligent-investor': '../output/readalong/preface-to-the-fourth-edition-by-warren-e-buffett'
+            'the-intelligent-investor': '../output/readalong/the-intelligent-investor'
         };
 
         // Initialize
@@ -1423,6 +1423,8 @@ class ReadAlongReader {
         document.querySelectorAll('.theme-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.theme === theme);
         });
+        // Sync theme across library and reader
+        localStorage.setItem('scriptum-theme', theme);
         this.saveSettings();
     }
 
@@ -2368,7 +2370,9 @@ class ReadAlongReader {
             const settings = JSON.parse(localStorage.getItem('readalong-settings') || '{}');
 
             if (settings.fontSize) this.setFontSize(settings.fontSize);
-            if (settings.theme) this.setTheme(settings.theme);
+            // Use reader's saved theme, or fall back to library theme for consistency
+            var theme = settings.theme || localStorage.getItem('scriptum-theme') || 'dark';
+            this.setTheme(theme);
             if (settings.speed) this.setSpeed(settings.speed);
             if (settings.autoScroll !== undefined) {
                 this.autoScroll = settings.autoScroll;

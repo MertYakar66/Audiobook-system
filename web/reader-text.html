@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0d1117">
     <meta name="mobile-web-app-capable" content="yes">
     <title>Scriptum - Reader</title>
-    <link rel="stylesheet" href="reader-text.css?v=4">
+    <link rel="stylesheet" href="reader-text.css?v=5">
 </head>
 
 <body>
@@ -48,6 +48,32 @@
                     <polyline points="9 18 15 12 9 6" />
                 </svg>
             </button>
+        </div>
+
+        <!-- Annotation Toolbar -->
+        <div class="annotation-toolbar" id="annotation-toolbar">
+            <div class="tool-colors">
+                <button class="tool-color selected" data-color="yellow" style="background: #fff59d" title="Yellow"></button>
+                <button class="tool-color" data-color="green" style="background: #c8e6c9" title="Green"></button>
+                <button class="tool-color" data-color="blue" style="background: #bbdefb" title="Blue"></button>
+                <button class="tool-color" data-color="pink" style="background: #f8bbd9" title="Pink"></button>
+                <button class="tool-color" data-color="orange" style="background: #ffcc80" title="Orange"></button>
+            </div>
+            <div class="tool-divider"></div>
+            <div class="tool-buttons">
+                <button class="tool-btn" id="tool-highlight" data-tool="highlight" title="Highlight sentences">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                    <span>Highlight</span>
+                </button>
+                <button class="tool-btn" id="tool-note" data-tool="note" title="Add note to sentence">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                    <span>Note</span>
+                </button>
+                <button class="tool-btn" id="tool-eraser" data-tool="eraser" title="Remove highlight">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M20 20H7L3 16l7-7 10 10z"/><path d="M6 11l7-7 5 5"/><line x1="18" y1="20" x2="22" y2="20"/></svg>
+                    <span>Eraser</span>
+                </button>
+            </div>
         </div>
 
         <!-- Main Content -->
@@ -93,7 +119,7 @@
                                 <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
                             </svg>
                             <p>No highlights yet</p>
-                            <span>Select text and pick a color to highlight</span>
+                            <span>Use the toolbar above, then click sentences</span>
                         </div>
                     </div>
                 </div>
@@ -110,7 +136,7 @@
                                 <line x1="16" y1="17" x2="8" y2="17" />
                             </svg>
                             <p>No notes yet</p>
-                            <span>Select text and tap the note icon to add one</span>
+                            <span>Use the Note tool, then click a sentence</span>
                         </div>
                     </div>
                 </div>
@@ -165,7 +191,7 @@
         <div id="toast" class="toast"></div>
     </div>
 
-    <script src="reader-text.js?v=4"></script>
+    <script src="reader-text.js?v=5"></script>
 </body>
 
 </html>
