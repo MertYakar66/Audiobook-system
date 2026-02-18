@@ -20,8 +20,8 @@ const BOOK_SOURCES = {
     }
 };
 
-// PDF.js worker
-const PDFJS_CDN = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379";
+// PDF.js CDN (jsdelivr mirrors npm pdfjs-dist)
+const PDFJS_CDN = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.269/build";
 
 // Highlight colors
 const HIGHLIGHT_COLORS = [
@@ -545,12 +545,14 @@ class PDFReader {
 
     openSidebar() {
         document.getElementById('pdf-sidebar').classList.add('open');
+        document.getElementById('pdf-sidebar-overlay')?.classList.add('open');
         this.renderNotesList();
         this.renderHighlightsList();
     }
 
     closeSidebar() {
         document.getElementById('pdf-sidebar').classList.remove('open');
+        document.getElementById('pdf-sidebar-overlay')?.classList.remove('open');
     }
 
     openNoteModal() {
@@ -646,11 +648,9 @@ class PDFReader {
             });
         });
 
-        // Close sidebar on outside click
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest('.pdf-sidebar') && !e.target.closest('#pdf-sidebar-btn')) {
-                this.closeSidebar();
-            }
+        // Close sidebar on overlay click
+        document.getElementById('pdf-sidebar-overlay')?.addEventListener('click', () => {
+            this.closeSidebar();
         });
 
         // Keyboard

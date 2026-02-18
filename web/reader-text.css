@@ -284,6 +284,25 @@ body {
 
 /* ==================== SIDEBAR ==================== */
 
+/* Sidebar backdrop overlay */
+.pdf-sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 199;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.pdf-sidebar-overlay.open {
+    opacity: 1;
+    visibility: visible;
+}
+
 .pdf-sidebar {
     position: fixed;
     top: 0;
@@ -292,10 +311,11 @@ body {
     height: 100%;
     background: var(--bg);
     border-left: 1px solid var(--border);
-    box-shadow: -2px 0 10px rgba(0, 0, 0, 0.3);
+    box-shadow: -2px 0 20px rgba(0, 0, 0, 0.5);
     z-index: 200;
     transition: right 0.3s ease;
     overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .pdf-sidebar.open {
