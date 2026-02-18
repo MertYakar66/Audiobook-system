@@ -64,17 +64,20 @@ class PDFReader {
             this.pdfDoc = await loadingTask.promise;
             this.totalPages = this.pdfDoc.numPages;
 
-            // Update UI
-            document.getElementById('page-indicator').textContent = `1 / ${this.totalPages}`;
-            const slider = document.getElementById('page-slider');
-            slider.max = this.totalPages;
-            slider.value = 1;
-
             // Create page placeholders
+
             this.createPagePlaceholders();
 
             // Restore saved progress
             this.restoreProgress();
+
+            // Update slider range
+            const slider = document.getElementById('page-slider');
+            if (slider) {
+                slider.max = this.totalPages;
+                slider.value = this.currentPage;
+                document.getElementById('page-indicator').textContent = `${this.currentPage} / ${this.totalPages}`;
+            }
 
             // Show the viewer
             document.getElementById('loading-state').style.display = 'none';

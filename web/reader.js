@@ -331,10 +331,13 @@ class ReadAlongReader {
     addHighlightFromToolbar() {
         if (!this.selectedSentenceId || !this.bookData) return;
 
+        const chapter = this.timingData?.chapters?.[this.currentChapter];
         const highlight = {
             id: Date.now().toString(),
             bookId: this.bookData.bookId,
             chapter: this.currentChapter,
+            chapterTitle: chapter?.title || `Chapter ${this.currentChapter + 1}`,
+            audioTime: this.audio?.currentTime || 0,
             sentenceId: this.selectedSentenceId,
             text: this.selectedText,
             color: this.selectedHighlightColor,
@@ -648,6 +651,15 @@ class ReadAlongReader {
         });
         document.getElementById('highlight-only').addEventListener('click', () => {
             this.addHighlight();
+        });
+
+        // Modal color picker
+        document.querySelectorAll('.color-pick-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.color-pick-btn').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+                this.selectedHighlightColor = btn.dataset.color;
+            });
         });
 
         // Text selection for notes
@@ -1525,6 +1537,8 @@ class ReadAlongReader {
         const container = document.getElementById('bookmarks-list');
         const bookBookmarks = this.bookmarks.filter(b => b.bookId === this.bookData?.bookId);
 
+        this._updateTabBadges();
+
         if (bookBookmarks.length === 0) {
             container.innerHTML = '<p class="empty-message">No bookmarks yet. Click the bookmark button while listening to add one.</p>';
             return;
@@ -1628,13 +1642,17 @@ class ReadAlongReader {
         const noteText = document.getElementById('note-input').value.trim();
         if (!noteText && !this.selectedText) return;
 
+        const chapter = this.timingData?.chapters?.[this.currentChapter];
         const note = {
             id: Date.now().toString(),
             bookId: this.bookData.bookId,
             chapter: this.currentChapter,
+            chapterTitle: chapter?.title || `Chapter ${this.currentChapter + 1}`,
+            audioTime: this.audio?.currentTime || 0,
             sentenceId: this.selectedSentenceId,
             selectedText: this.selectedText,
             note: noteText,
+            color: this.selectedHighlightColor,
             createdAt: new Date().toISOString()
         };
 
@@ -1656,10 +1674,13 @@ class ReadAlongReader {
     addHighlight() {
         if (!this.selectedSentenceId || !this.bookData) return;
 
+        const chapter = this.timingData?.chapters?.[this.currentChapter];
         const highlight = {
             id: Date.now().toString(),
             bookId: this.bookData.bookId,
             chapter: this.currentChapter,
+            chapterTitle: chapter?.title || `Chapter ${this.currentChapter + 1}`,
+            audioTime: this.audio?.currentTime || 0,
             sentenceId: this.selectedSentenceId,
             text: this.selectedText,
             color: this.selectedHighlightColor,
@@ -1707,24 +1728,59 @@ class ReadAlongReader {
         const container = document.getElementById('notes-list');
         const bookNotes = this.notes.filter(n => n.bookId === this.bookData?.bookId);
 
+        this._updateTabBadges();
+
         if (bookNotes.length === 0) {
-            container.innerHTML = '<p class="empty-message">No notes yet. Select text to add a note.</p>';
+            container.innerHTML = `
+                <div class="empty-state-card">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="40" height="40">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="16" y1="13" x2="8" y2="13"/>
+                        <line x1="16" y1="17" x2="8" y2="17"/>
+                    </svg>
+                    <p>No notes yet</p>
+                    <span>Select text and tap the note icon to add one</span>
+                </div>`;
             return;
         }
 
-        container.innerHTML = bookNotes.map(n => `
-            <div class="note-item" data-id="${n.id}">
-                <button class="note-delete" onclick="event.stopPropagation(); reader.removeNote('${n.id}')">Delete</button>
-                <div class="note-chapter">Chapter ${n.chapter + 1}</div>
-                <div class="note-text">"${n.selectedText.substring(0, 80)}${n.selectedText.length > 80 ? '...' : ''}"</div>
-                <div class="note-content">${n.note}</div>
-                <div class="note-date">${new Date(n.createdAt).toLocaleDateString()}</div>
-            </div>
-        `).join('');
+        container.innerHTML = bookNotes.map(n => {
+            const colorObj = this.highlightColors.find(c => c.name === (n.color || 'yellow'));
+            const borderColor = colorObj ? colorObj.color : '#fff59d';
+            const dateStr = this._formatDate(n.createdAt);
+            const chTitle = n.chapterTitle || `Chapter ${n.chapter + 1}`;
+            const audioStr = n.audioTime ? this.formatTime(n.audioTime) : null;
+            return `
+                <div class="annotation-card" data-id="${n.id}" style="border-left: 4px solid ${borderColor}">
+                    <button class="annotation-delete" onclick="event.stopPropagation(); reader.removeNote('${n.id}')" title="Delete">×</button>
+                    <div class="annotation-meta">
+                        <span class="annotation-chapter">${chTitle}</span>
+                        ${audioStr ? `<span class="annotation-time" data-time="${n.audioTime}" data-chapter="${n.chapter}" title="Jump to this time">&#9202; ${audioStr}</span>` : ''}
+                    </div>
+                    <div class="annotation-quote">"${n.selectedText.substring(0, 150)}${n.selectedText.length > 150 ? '...' : ''}"</div>
+                    <div class="annotation-note">${n.note}</div>
+                    <div class="annotation-date">${dateStr}</div>
+                </div>`;
+        }).join('');
 
-        // Add click handlers to jump to note location
-        container.querySelectorAll('.note-item').forEach(item => {
-            item.addEventListener('click', () => {
+        // Click handlers
+        container.querySelectorAll('.annotation-card').forEach(item => {
+            item.addEventListener('click', (e) => {
+                // Handle audio timestamp click
+                const timeEl = e.target.closest('.annotation-time');
+                if (timeEl) {
+                    const time = parseFloat(timeEl.dataset.time);
+                    const ch = parseInt(timeEl.dataset.chapter);
+                    if (ch !== this.currentChapter) {
+                        this.loadChapter(ch, time);
+                    } else {
+                        this.audio.currentTime = time;
+                    }
+                    document.getElementById('bookmarks-panel').classList.remove('open');
+                    return;
+                }
+
                 const note = this.notes.find(n => n.id === item.dataset.id);
                 if (note) {
                     if (note.chapter !== this.currentChapter) {
@@ -1734,8 +1790,8 @@ class ReadAlongReader {
                         const el = document.querySelector(`[data-id="${note.sentenceId}"]`);
                         if (el) {
                             el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                            el.classList.add('active');
-                            setTimeout(() => el.classList.remove('active'), 2000);
+                            el.classList.add('flash');
+                            setTimeout(() => el.classList.remove('flash'), 1500);
                         }
                     }, 500);
                     document.getElementById('bookmarks-panel').classList.remove('open');
@@ -1753,27 +1809,54 @@ class ReadAlongReader {
 
         const bookHighlights = this.highlights.filter(h => h.bookId === this.bookData?.bookId);
 
+        this._updateTabBadges();
+
         if (bookHighlights.length === 0) {
-            container.innerHTML = '<p class="empty-message">No highlights yet. Select text to highlight.</p>';
+            container.innerHTML = `
+                <div class="empty-state-card">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="40" height="40">
+                        <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                    </svg>
+                    <p>No highlights yet</p>
+                    <span>Select text and pick a color to highlight</span>
+                </div>`;
             return;
         }
 
         container.innerHTML = bookHighlights.map(h => {
             const colorObj = this.highlightColors.find(c => c.name === (h.color || 'yellow'));
             const bgColor = colorObj ? colorObj.color : '#fff59d';
+            const dateStr = this._formatDate(h.createdAt);
+            const chTitle = h.chapterTitle || `Chapter ${h.chapter + 1}`;
+            const audioStr = h.audioTime ? this.formatTime(h.audioTime) : null;
             return `
-                <div class="highlight-item" data-id="${h.id}" style="border-left: 4px solid ${bgColor}">
-                    <button class="highlight-delete" onclick="event.stopPropagation(); reader.removeHighlight('${h.id}')">Delete</button>
-                    <div class="highlight-chapter">Chapter ${h.chapter + 1}</div>
-                    <div class="highlight-text" style="background: ${bgColor}">"${h.text.substring(0, 100)}${h.text.length > 100 ? '...' : ''}"</div>
-                    <div class="highlight-date">${new Date(h.createdAt).toLocaleDateString()}</div>
-                </div>
-            `;
+                <div class="annotation-card" data-id="${h.id}" style="border-left: 4px solid ${bgColor}">
+                    <button class="annotation-delete" onclick="event.stopPropagation(); reader.removeHighlight('${h.id}')" title="Delete">×</button>
+                    <div class="annotation-meta">
+                        <span class="annotation-chapter">${chTitle}</span>
+                        ${audioStr ? `<span class="annotation-time" data-time="${h.audioTime}" data-chapter="${h.chapter}" title="Jump to this time">&#9202; ${audioStr}</span>` : ''}
+                    </div>
+                    <div class="annotation-quote" style="background: ${bgColor}; color: #1a1a2e;">"${h.text.substring(0, 150)}${h.text.length > 150 ? '...' : ''}"</div>
+                    <div class="annotation-date">${dateStr}</div>
+                </div>`;
         }).join('');
 
-        // Add click handlers
-        container.querySelectorAll('.highlight-item').forEach(item => {
-            item.addEventListener('click', () => {
+        // Click handlers
+        container.querySelectorAll('.annotation-card').forEach(item => {
+            item.addEventListener('click', (e) => {
+                const timeEl = e.target.closest('.annotation-time');
+                if (timeEl) {
+                    const time = parseFloat(timeEl.dataset.time);
+                    const ch = parseInt(timeEl.dataset.chapter);
+                    if (ch !== this.currentChapter) {
+                        this.loadChapter(ch, time);
+                    } else {
+                        this.audio.currentTime = time;
+                    }
+                    document.getElementById('bookmarks-panel').classList.remove('open');
+                    return;
+                }
+
                 const highlight = this.highlights.find(h => h.id === item.dataset.id);
                 if (highlight) {
                     if (highlight.chapter !== this.currentChapter) {
@@ -1821,25 +1904,30 @@ class ReadAlongReader {
         const bookNotes = this.notes.filter(n => n.bookId === this.bookData.bookId);
         const bookHighlights = this.highlights.filter(h => h.bookId === this.bookData.bookId);
 
-        let content = `# Notes and Highlights\n`;
-        content += `## ${this.bookData.title}\n`;
-        content += `By ${this.bookData.author}\n`;
-        content += `Exported: ${new Date().toLocaleDateString()}\n\n`;
+        let content = `# Notes and Highlights\n\n`;
+        content += `**${this.bookData.title}**\n`;
+        content += `*By ${this.bookData.author}*\n\n`;
+        content += `Exported: ${this._formatDate(new Date().toISOString())}\n\n`;
+        content += `---\n\n`;
 
         if (bookHighlights.length > 0) {
             content += `## Highlights (${bookHighlights.length})\n\n`;
             bookHighlights.forEach((h, i) => {
-                content += `${i + 1}. "${h.text}"\n`;
-                content += `   - Chapter ${h.chapter + 1}, ${new Date(h.createdAt).toLocaleDateString()}\n\n`;
+                const chTitle = h.chapterTitle || `Chapter ${h.chapter + 1}`;
+                const audioStr = h.audioTime ? ` | Audio: ${this.formatTime(h.audioTime)}` : '';
+                content += `${i + 1}. > "${h.text}"\n\n`;
+                content += `   *${chTitle}${audioStr} | ${this._formatDate(h.createdAt)}*\n\n`;
             });
         }
 
         if (bookNotes.length > 0) {
             content += `## Notes (${bookNotes.length})\n\n`;
             bookNotes.forEach((n, i) => {
-                content += `${i + 1}. "${n.selectedText}"\n`;
-                content += `   Note: ${n.note}\n`;
-                content += `   - Chapter ${n.chapter + 1}, ${new Date(n.createdAt).toLocaleDateString()}\n\n`;
+                const chTitle = n.chapterTitle || `Chapter ${n.chapter + 1}`;
+                const audioStr = n.audioTime ? ` | Audio: ${this.formatTime(n.audioTime)}` : '';
+                content += `${i + 1}. > "${n.selectedText}"\n\n`;
+                content += `   **Note:** ${n.note}\n\n`;
+                content += `   *${chTitle}${audioStr} | ${this._formatDate(n.createdAt)}*\n\n`;
             });
         }
 
@@ -2295,6 +2383,47 @@ class ReadAlongReader {
     }
 
     // ==================== UTILITIES ====================
+
+    /**
+     * Format ISO date string into readable format (e.g. "Feb 17, 2026 at 11:50 AM")
+     */
+    _formatDate(isoString) {
+        try {
+            const d = new Date(isoString);
+            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) +
+                ' at ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+        } catch {
+            return isoString;
+        }
+    }
+
+    /**
+     * Update badge counts on sidebar tabs
+     */
+    _updateTabBadges() {
+        if (!this.bookData) return;
+        const bid = this.bookData.bookId;
+        const counts = {
+            bookmarks: this.bookmarks.filter(b => b.bookId === bid).length,
+            highlights: this.highlights.filter(h => h.bookId === bid).length,
+            notes: this.notes.filter(n => n.bookId === bid).length
+        };
+        document.querySelectorAll('.panel-tab').forEach(tab => {
+            const name = tab.dataset.tab;
+            const count = counts[name];
+            let badge = tab.querySelector('.tab-badge');
+            if (count > 0) {
+                if (!badge) {
+                    badge = document.createElement('span');
+                    badge.className = 'tab-badge';
+                    tab.appendChild(badge);
+                }
+                badge.textContent = count;
+            } else if (badge) {
+                badge.remove();
+            }
+        });
+    }
 
     /**
      * Format time in M:SS or H:MM:SS
