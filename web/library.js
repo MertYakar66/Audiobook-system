@@ -9,7 +9,7 @@
 const READ_LISTEN_BOOKS = [
     {
         id: "the-intelligent-investor",
-        path: "../output/readalong/The_Intelligent_Investor",
+        path: "../output/readalong/the-intelligent-investor",
         title: "The Intelligent Investor",
         author: "Benjamin Graham",
         cover: "../input/intelligentcover.jpg",
