@@ -3,7 +3,7 @@
   "bookId": "the-intelligent-investor",
   "title": "The Intelligent Investor",
   "author": "Benjamin Graham",
-  "cover": null,
+  "cover": "../../input/intelligentcover.jpg",
   "timing": "timing.json",
   "text": "text.json",
   "totalDuration": 0,
