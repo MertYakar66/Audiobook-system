@@ -18,6 +18,28 @@
     --line-height: 1.75;
 }
 
+/* Light theme */
+[data-theme="light"] {
+    --bg: #f8f9fc;
+    --bg-header: #eef0f5;
+    --text: #1a1a2e;
+    --text-dim: #5a5a72;
+    --border: #d8dae5;
+    --highlight-bg: #fff3cd;
+    --highlight-border: #ffc107;
+}
+
+/* Sepia theme */
+[data-theme="sepia"] {
+    --bg: #f4ecd8;
+    --bg-header: #efe4d0;
+    --text: #5c4a32;
+    --text-dim: #8b7355;
+    --border: #d4c5a9;
+    --highlight-bg: #ffeaa7;
+    --highlight-border: #e17055;
+}
+
 *, *::before, *::after {
     box-sizing: border-box;
     margin: 0;
@@ -35,6 +57,7 @@ body {
     line-height: var(--line-height);
     height: 100vh;
     overflow: hidden;
+    transition: background 0.2s ease, color 0.2s ease;
 }
 
 #app {

@@ -66,6 +66,7 @@ class ReadAlongReader {
         this.selectionRange = null;
 
         // Browser TTS fallback (used when audio files are missing)
+        this.noAudioAvailable = false;
         this.browserTTSMode = false;
         this.ttsCurrentIndex = 0;
         this.ttsUtterance = null;
@@ -420,6 +421,16 @@ class ReadAlongReader {
             // Store base path for audio files
             this.audioBasePath = basePath;
 
+            // Detect if audio was never generated (TTS engine pending)
+            // If so, proactively enable browser TTS to avoid delays from
+            // HEAD requests to nonexistent audio files
+            const ttsEngine = this.bookData.generated && this.bookData.generated.tts_engine;
+            if (ttsEngine === 'pending') {
+                this.noAudioAvailable = true;
+                this._enableBrowserTTS();
+                console.log('[Reader] No audio generated (tts_engine=pending) — using browser TTS');
+            }
+
             // Load text.json FIRST — it's what the user sees (prioritize LCP)
             const textResponse = await fetch(`${basePath}/${this.bookData.text}`);
             this.textData = textResponse.ok ? await textResponse.json() : null;
@@ -430,7 +441,7 @@ class ReadAlongReader {
             // Initialize reader with text immediately (timing loads in background)
             // Create a minimal timing structure so initializeReader works
             this.timingData = this._createMinimalTimingData();
-            this.initializeReader();
+            await this.initializeReader();
             this.showLoading(false);
 
             // Load timing.json in the background (large file, not needed for initial render)
@@ -822,7 +833,7 @@ class ReadAlongReader {
     /**
      * Initialize the reader with loaded book data
      */
-    initializeReader() {
+    async initializeReader() {
         // Update header
         this.bookTitle.textContent = this.bookData.title;
         this.bookAuthor.textContent = this.bookData.author;
@@ -842,9 +853,10 @@ class ReadAlongReader {
         document.getElementById('player').style.display = 'block';
 
         // Load saved progress or first chapter
+        // Await loadChapter so browserTTSMode is set before we check it
         const savedProgress = this.getSavedProgress();
         if (savedProgress) {
-            this.loadChapter(savedProgress.chapter, savedProgress.position);
+            await this.loadChapter(savedProgress.chapter, savedProgress.position);
             // Restore TTS sentence position if in TTS mode
             if (this.browserTTSMode && savedProgress.ttsSentenceIndex) {
                 this.ttsCurrentIndex = savedProgress.ttsSentenceIndex;
@@ -855,7 +867,7 @@ class ReadAlongReader {
             }
             this.showToast('Resumed from where you left off');
         } else {
-            this.loadChapter(0);
+            await this.loadChapter(0);
         }
 
         // Render bookmarks, notes, highlights
@@ -889,8 +901,10 @@ class ReadAlongReader {
         // Prefer MP3 for faster loading, fall back to WAV
         const mp3FileName = audioFileName.replace(/\.wav$/i, '.mp3');
 
-        // Check if already in browser TTS mode (audio files unavailable)
-        if (this.browserTTSMode) {
+        // Check if already in browser TTS mode (audio files unavailable or never generated)
+        if (this.browserTTSMode || this.noAudioAvailable) {
+            // Ensure TTS mode is enabled
+            if (!this.browserTTSMode) this._enableBrowserTTS();
             // Stop any current TTS speech
             speechSynthesis.cancel();
             this.ttsCurrentIndex = 0;
@@ -922,10 +936,9 @@ class ReadAlongReader {
                     }
                 }
             } catch (e) {
-                // Network error — try setting src and let browser handle it
-                this.audio.preload = 'auto';
-                this.audio.src = mp3Url;
-                audioAvailable = true; // optimistic
+                // Network error — don't assume audio exists, switch to TTS
+                console.warn('[Reader] Network error checking audio, falling back to TTS');
+                audioAvailable = false;
             }
 
             if (!audioAvailable) {
