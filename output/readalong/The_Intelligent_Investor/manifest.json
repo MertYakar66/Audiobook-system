@@ -158,7 +158,7 @@
     }
   ],
   "generated": {
-    "tts_engine": "pending",
+    "tts_engine": "edge-tts",
     "timestamp": "2025-02-05T00:00:00"
   }
 }
