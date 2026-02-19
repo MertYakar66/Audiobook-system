@@ -903,23 +903,35 @@ class ReadAlongReader {
             const mp3Url = `${this.audioBasePath}/audio/${mp3FileName}`;
             const wavUrl = `${this.audioBasePath}/audio/${audioFileName}`;
 
-            this.audio.preload = 'auto';
-            this.audio.src = mp3Url;
-
-            const handleAudioError = () => {
-                if (this.audio.src.includes('.mp3')) {
-                    // MP3 failed, try WAV
-                    this.audio.addEventListener('error', handleAudioError, { once: true });
-                    this.audio.src = wavUrl;
+            // Proactively check if audio file exists (HEAD request)
+            // This avoids race conditions where user clicks Play before error fires
+            let audioAvailable = false;
+            try {
+                const headResp = await fetch(mp3Url, { method: 'HEAD' });
+                if (headResp.ok) {
+                    this.audio.preload = 'auto';
+                    this.audio.src = mp3Url;
+                    audioAvailable = true;
                 } else {
-                    // Both MP3 and WAV failed — switch to browser TTS
-                    this._enableBrowserTTS();
+                    // MP3 not found, try WAV
+                    const wavResp = await fetch(wavUrl, { method: 'HEAD' });
+                    if (wavResp.ok) {
+                        this.audio.preload = 'auto';
+                        this.audio.src = wavUrl;
+                        audioAvailable = true;
+                    }
                 }
-            };
-            this.audio.addEventListener('error', handleAudioError, { once: true });
+            } catch (e) {
+                // Network error — try setting src and let browser handle it
+                this.audio.preload = 'auto';
+                this.audio.src = mp3Url;
+                audioAvailable = true; // optimistic
+            }
 
-            // Wait for audio to load then seek
-            if (startPosition > 0) {
+            if (!audioAvailable) {
+                // Neither MP3 nor WAV exists — switch to browser TTS
+                this._enableBrowserTTS();
+            } else if (startPosition > 0) {
                 this.audio.addEventListener('loadedmetadata', () => {
                     this.audio.currentTime = startPosition;
                 }, { once: true });
@@ -1367,7 +1379,16 @@ class ReadAlongReader {
             return;
         }
         if (this.audio.paused) {
-            this.audio.play();
+            const playPromise = this.audio.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(() => {
+                    // Audio source unavailable — switch to browser TTS
+                    if (!this.browserTTSMode) {
+                        this._enableBrowserTTS();
+                    }
+                    this.ttsToggle();
+                });
+            }
         } else {
             this.audio.pause();
         }
