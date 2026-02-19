@@ -66,7 +66,6 @@ class ReadAlongReader {
         this.selectionRange = null;
 
         // Browser TTS fallback (used when audio files are missing)
-        this.noAudioAvailable = false;
         this.browserTTSMode = false;
         this.ttsCurrentIndex = 0;
         this.ttsUtterance = null;
@@ -421,16 +420,6 @@ class ReadAlongReader {
             // Store base path for audio files
             this.audioBasePath = basePath;
 
-            // Detect if audio was never generated (TTS engine pending)
-            // If so, proactively enable browser TTS to avoid delays from
-            // HEAD requests to nonexistent audio files
-            const ttsEngine = this.bookData.generated && this.bookData.generated.tts_engine;
-            if (ttsEngine === 'pending') {
-                this.noAudioAvailable = true;
-                this._enableBrowserTTS();
-                console.log('[Reader] No audio generated (tts_engine=pending) — using browser TTS');
-            }
-
             // Load text.json FIRST — it's what the user sees (prioritize LCP)
             const textResponse = await fetch(`${basePath}/${this.bookData.text}`);
             this.textData = textResponse.ok ? await textResponse.json() : null;
@@ -449,6 +438,20 @@ class ReadAlongReader {
                 .then(r => r.ok ? r.json() : null)
                 .then(timingResult => {
                     if (timingResult) {
+                        // Preserve any already-computed timings on the current chapter
+                        // to avoid a flash when entries reset to zeros during replacement
+                        const currentCh = this.timingData.chapters[this.currentChapter];
+                        if (currentCh && currentCh._timingsDuration) {
+                            const newCh = timingResult.chapters[this.currentChapter];
+                            if (newCh) {
+                                // Copy the computed start/end from the old entries
+                                for (let i = 0; i < Math.min(currentCh.entries.length, newCh.entries.length); i++) {
+                                    newCh.entries[i].start = currentCh.entries[i].start;
+                                    newCh.entries[i].end = currentCh.entries[i].end;
+                                }
+                                newCh._timingsDuration = currentCh._timingsDuration;
+                            }
+                        }
                         this.timingData = timingResult;
                         console.log('[Reader] Timing data loaded in background:',
                             timingResult.chapters.length, 'chapters');
@@ -901,10 +904,8 @@ class ReadAlongReader {
         // Prefer MP3 for faster loading, fall back to WAV
         const mp3FileName = audioFileName.replace(/\.wav$/i, '.mp3');
 
-        // Check if already in browser TTS mode (audio files unavailable or never generated)
-        if (this.browserTTSMode || this.noAudioAvailable) {
-            // Ensure TTS mode is enabled
-            if (!this.browserTTSMode) this._enableBrowserTTS();
+        // Check if already in browser TTS mode (audio files unavailable)
+        if (this.browserTTSMode) {
             // Stop any current TTS speech
             speechSynthesis.cancel();
             this.ttsCurrentIndex = 0;
@@ -1090,8 +1091,8 @@ class ReadAlongReader {
         const duration = this.audio.duration;
         if (!duration || !isFinite(duration)) return;
 
-        // Compute timings on first call if not done yet
-        if (!chapter._timingsDuration) {
+        // Compute timings on first call or after timing data was replaced
+        if (!chapter._timingsDuration || chapter._timingsDuration !== duration) {
             this.computeChapterTimings(this.currentChapter, duration);
         }
 
