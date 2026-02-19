@@ -67,6 +67,7 @@ class TextReader {
         document.title = this.bookInfo.title + ' - Scriptum';
 
         this.loadAnnotations();
+        this.loadTheme();
         this.bindEvents();
         await this.loadBook();
     }
@@ -721,6 +722,22 @@ class TextReader {
             else if (e.key === 'n') self.setActiveTool('note');
             else if (e.key === 'e') self.setActiveTool('eraser');
         });
+    }
+
+    // ==================== THEME ====================
+
+    setTheme(theme) {
+        if (theme === 'dark') {
+            document.body.removeAttribute('data-theme');
+        } else {
+            document.body.dataset.theme = theme;
+        }
+        localStorage.setItem('scriptum-theme', theme);
+    }
+
+    loadTheme() {
+        var theme = localStorage.getItem('scriptum-theme') || 'dark';
+        this.setTheme(theme);
     }
 
     // ==================== UTILITIES ====================

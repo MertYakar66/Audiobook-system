@@ -430,7 +430,7 @@ class ReadAlongReader {
             // Initialize reader with text immediately (timing loads in background)
             // Create a minimal timing structure so initializeReader works
             this.timingData = this._createMinimalTimingData();
-            this.initializeReader();
+            await this.initializeReader();
             this.showLoading(false);
 
             // Load timing.json in the background (large file, not needed for initial render)
@@ -438,6 +438,20 @@ class ReadAlongReader {
                 .then(r => r.ok ? r.json() : null)
                 .then(timingResult => {
                     if (timingResult) {
+                        // Preserve any already-computed timings on the current chapter
+                        // to avoid a flash when entries reset to zeros during replacement
+                        const currentCh = this.timingData.chapters[this.currentChapter];
+                        if (currentCh && currentCh._timingsDuration) {
+                            const newCh = timingResult.chapters[this.currentChapter];
+                            if (newCh) {
+                                // Copy the computed start/end from the old entries
+                                for (let i = 0; i < Math.min(currentCh.entries.length, newCh.entries.length); i++) {
+                                    newCh.entries[i].start = currentCh.entries[i].start;
+                                    newCh.entries[i].end = currentCh.entries[i].end;
+                                }
+                                newCh._timingsDuration = currentCh._timingsDuration;
+                            }
+                        }
                         this.timingData = timingResult;
                         console.log('[Reader] Timing data loaded in background:',
                             timingResult.chapters.length, 'chapters');
@@ -822,7 +836,7 @@ class ReadAlongReader {
     /**
      * Initialize the reader with loaded book data
      */
-    initializeReader() {
+    async initializeReader() {
         // Update header
         this.bookTitle.textContent = this.bookData.title;
         this.bookAuthor.textContent = this.bookData.author;
@@ -842,9 +856,10 @@ class ReadAlongReader {
         document.getElementById('player').style.display = 'block';
 
         // Load saved progress or first chapter
+        // Await loadChapter so browserTTSMode is set before we check it
         const savedProgress = this.getSavedProgress();
         if (savedProgress) {
-            this.loadChapter(savedProgress.chapter, savedProgress.position);
+            await this.loadChapter(savedProgress.chapter, savedProgress.position);
             // Restore TTS sentence position if in TTS mode
             if (this.browserTTSMode && savedProgress.ttsSentenceIndex) {
                 this.ttsCurrentIndex = savedProgress.ttsSentenceIndex;
@@ -855,7 +870,7 @@ class ReadAlongReader {
             }
             this.showToast('Resumed from where you left off');
         } else {
-            this.loadChapter(0);
+            await this.loadChapter(0);
         }
 
         // Render bookmarks, notes, highlights
@@ -922,10 +937,9 @@ class ReadAlongReader {
                     }
                 }
             } catch (e) {
-                // Network error — try setting src and let browser handle it
-                this.audio.preload = 'auto';
-                this.audio.src = mp3Url;
-                audioAvailable = true; // optimistic
+                // Network error — don't assume audio exists, switch to TTS
+                console.warn('[Reader] Network error checking audio, falling back to TTS');
+                audioAvailable = false;
             }
 
             if (!audioAvailable) {
@@ -1077,8 +1091,8 @@ class ReadAlongReader {
         const duration = this.audio.duration;
         if (!duration || !isFinite(duration)) return;
 
-        // Compute timings on first call if not done yet
-        if (!chapter._timingsDuration) {
+        // Compute timings on first call or after timing data was replaced
+        if (!chapter._timingsDuration || chapter._timingsDuration !== duration) {
             this.computeChapterTimings(this.currentChapter, duration);
         }
 
