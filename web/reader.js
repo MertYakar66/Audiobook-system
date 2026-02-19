@@ -106,7 +106,7 @@ class ReadAlongReader {
 
         // Book catalog for URL-based loading
         this.booksCatalog = {
-            'the-intelligent-investor': '../output/readalong/The_Intelligent_Investor'
+            'the-intelligent-investor': '../output/readalong/preface-to-the-fourth-edition-by-warren-e-buffett'
         };
 
         // Initialize
@@ -430,7 +430,7 @@ class ReadAlongReader {
             // Initialize reader with text immediately (timing loads in background)
             // Create a minimal timing structure so initializeReader works
             this.timingData = this._createMinimalTimingData();
-            await this.initializeReader();
+            this.initializeReader();
             this.showLoading(false);
 
             // Load timing.json in the background (large file, not needed for initial render)
@@ -438,20 +438,6 @@ class ReadAlongReader {
                 .then(r => r.ok ? r.json() : null)
                 .then(timingResult => {
                     if (timingResult) {
-                        // Preserve any already-computed timings on the current chapter
-                        // to avoid a flash when entries reset to zeros during replacement
-                        const currentCh = this.timingData.chapters[this.currentChapter];
-                        if (currentCh && currentCh._timingsDuration) {
-                            const newCh = timingResult.chapters[this.currentChapter];
-                            if (newCh) {
-                                // Copy the computed start/end from the old entries
-                                for (let i = 0; i < Math.min(currentCh.entries.length, newCh.entries.length); i++) {
-                                    newCh.entries[i].start = currentCh.entries[i].start;
-                                    newCh.entries[i].end = currentCh.entries[i].end;
-                                }
-                                newCh._timingsDuration = currentCh._timingsDuration;
-                            }
-                        }
                         this.timingData = timingResult;
                         console.log('[Reader] Timing data loaded in background:',
                             timingResult.chapters.length, 'chapters');
@@ -836,7 +822,7 @@ class ReadAlongReader {
     /**
      * Initialize the reader with loaded book data
      */
-    async initializeReader() {
+    initializeReader() {
         // Update header
         this.bookTitle.textContent = this.bookData.title;
         this.bookAuthor.textContent = this.bookData.author;
@@ -856,21 +842,12 @@ class ReadAlongReader {
         document.getElementById('player').style.display = 'block';
 
         // Load saved progress or first chapter
-        // Await loadChapter so browserTTSMode is set before we check it
         const savedProgress = this.getSavedProgress();
         if (savedProgress) {
-            await this.loadChapter(savedProgress.chapter, savedProgress.position);
-            // Restore TTS sentence position if in TTS mode
-            if (this.browserTTSMode && savedProgress.ttsSentenceIndex) {
-                this.ttsCurrentIndex = savedProgress.ttsSentenceIndex;
-                this.currentSentenceIndex = -1;
-                this.updateHighlighting(-1, this.ttsCurrentIndex);
-                this.currentSentenceIndex = this.ttsCurrentIndex;
-                this._ttsUpdateProgress();
-            }
+            this.loadChapter(savedProgress.chapter, savedProgress.position);
             this.showToast('Resumed from where you left off');
         } else {
-            await this.loadChapter(0);
+            this.loadChapter(0);
         }
 
         // Render bookmarks, notes, highlights
@@ -904,48 +881,22 @@ class ReadAlongReader {
         // Prefer MP3 for faster loading, fall back to WAV
         const mp3FileName = audioFileName.replace(/\.wav$/i, '.mp3');
 
-        // Check if already in browser TTS mode (audio files unavailable)
-        if (this.browserTTSMode) {
-            // Stop any current TTS speech
-            speechSynthesis.cancel();
-            this.ttsCurrentIndex = 0;
-            this.updatePlayState(false);
-            this.totalTimeEl.textContent = 'TTS';
-        }
         // Check if loading from URL (audioBasePath) or from folder (audioFiles)
-        else if (this.audioBasePath) {
-            // Try MP3 first, fall back to WAV, then fall back to browser TTS
+        if (this.audioBasePath) {
+            // Try MP3 first, fall back to WAV
             const mp3Url = `${this.audioBasePath}/audio/${mp3FileName}`;
             const wavUrl = `${this.audioBasePath}/audio/${audioFileName}`;
 
-            // Proactively check if audio file exists (HEAD request)
-            // This avoids race conditions where user clicks Play before error fires
-            let audioAvailable = false;
-            try {
-                const headResp = await fetch(mp3Url, { method: 'HEAD' });
-                if (headResp.ok) {
-                    this.audio.preload = 'auto';
-                    this.audio.src = mp3Url;
-                    audioAvailable = true;
-                } else {
-                    // MP3 not found, try WAV
-                    const wavResp = await fetch(wavUrl, { method: 'HEAD' });
-                    if (wavResp.ok) {
-                        this.audio.preload = 'auto';
-                        this.audio.src = wavUrl;
-                        audioAvailable = true;
-                    }
+            this.audio.preload = 'auto';
+            this.audio.src = mp3Url;
+            this.audio.addEventListener('error', () => {
+                if (this.audio.src.endsWith('.mp3')) {
+                    this.audio.src = wavUrl;
                 }
-            } catch (e) {
-                // Network error — don't assume audio exists, switch to TTS
-                console.warn('[Reader] Network error checking audio, falling back to TTS');
-                audioAvailable = false;
-            }
+            }, { once: true });
 
-            if (!audioAvailable) {
-                // Neither MP3 nor WAV exists — switch to browser TTS
-                this._enableBrowserTTS();
-            } else if (startPosition > 0) {
+            // Wait for audio to load then seek
+            if (startPosition > 0) {
                 this.audio.addEventListener('loadedmetadata', () => {
                     this.audio.currentTime = startPosition;
                 }, { once: true });
@@ -961,9 +912,6 @@ class ReadAlongReader {
                     this.audio.currentTime = startPosition;
                 }, { once: true });
             }
-        } else {
-            // No audio source at all — switch to browser TTS
-            this._enableBrowserTTS();
         }
 
         // Reset progress
@@ -1091,8 +1039,8 @@ class ReadAlongReader {
         const duration = this.audio.duration;
         if (!duration || !isFinite(duration)) return;
 
-        // Compute timings on first call or after timing data was replaced
-        if (!chapter._timingsDuration || chapter._timingsDuration !== duration) {
+        // Compute timings on first call if not done yet
+        if (!chapter._timingsDuration) {
             this.computeChapterTimings(this.currentChapter, duration);
         }
 
