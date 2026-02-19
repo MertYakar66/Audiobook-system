@@ -105,12 +105,8 @@ class ReadAlongReader {
         this.pageZoomOutBtn = document.getElementById('page-zoom-out');
 
         // Book catalog for URL-based loading
-        // path = where manifest/text/timing live, audioPath = where audio files live
         this.booksCatalog = {
-            'the-intelligent-investor': {
-                path: '../output/readalong/the-intelligent-investor',
-                audioPath: '../output/readalong/preface-to-the-fourth-edition-by-warren-e-buffett'
-            }
+            'the-intelligent-investor': '../output/readalong/The_Intelligent_Investor'
         };
 
         // Initialize
@@ -405,17 +401,14 @@ class ReadAlongReader {
         const bookId = params.get('book');
 
         if (bookId && this.booksCatalog[bookId]) {
-            const catalog = this.booksCatalog[bookId];
-            const basePath = typeof catalog === 'string' ? catalog : catalog.path;
-            const audioPath = typeof catalog === 'string' ? catalog : (catalog.audioPath || catalog.path);
-            await this.loadBookFromPath(basePath, audioPath);
+            await this.loadBookFromPath(this.booksCatalog[bookId]);
         }
     }
 
     /**
      * Load book from server path
      */
-    async loadBookFromPath(basePath, audioPath) {
+    async loadBookFromPath(basePath) {
         try {
             this.showLoading(true);
 
@@ -425,7 +418,7 @@ class ReadAlongReader {
             this.bookData = await manifestResponse.json();
 
             // Store base path for audio files
-            this.audioBasePath = audioPath || basePath;
+            this.audioBasePath = basePath;
 
             // Load text.json FIRST — it's what the user sees (prioritize LCP)
             const textResponse = await fetch(`${basePath}/${this.bookData.text}`);
