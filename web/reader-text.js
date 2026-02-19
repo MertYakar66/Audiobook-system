@@ -15,12 +15,12 @@
 // Book registry — maps URL ?book= param to text data path
 const BOOK_SOURCES = {
     "the-intelligent-investor": {
-        textPath: "../output/readalong/The_Intelligent_Investor",
+        textPath: "../output/readalong/preface-to-the-fourth-edition-by-warren-e-buffett",
         title: "The Intelligent Investor",
         author: "Benjamin Graham"
     },
     "the-intelligent-investor-text": {
-        textPath: "../output/readalong/The_Intelligent_Investor",
+        textPath: "../output/readalong/preface-to-the-fourth-edition-by-warren-e-buffett",
         title: "The Intelligent Investor",
         author: "Benjamin Graham"
     }
