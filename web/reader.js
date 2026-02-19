@@ -106,7 +106,7 @@ class ReadAlongReader {
 
         // Book catalog for URL-based loading
         this.booksCatalog = {
-            'the-intelligent-investor': '../output/readalong/preface-to-the-fourth-edition-by-warren-e-buffett'
+            'the-intelligent-investor': '../output/readalong/The_Intelligent_Investor'
         };
 
         // Initialize
