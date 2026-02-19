@@ -65,6 +65,12 @@ class ReadAlongReader {
         this.selectedSentenceId = null;
         this.selectionRange = null;
 
+        // Browser TTS fallback (used when audio files are missing)
+        this.browserTTSMode = false;
+        this.ttsCurrentIndex = 0;
+        this.ttsUtterance = null;
+        this._ttsVoice = null;
+
         // Mobile/touch state
         this.isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
         this.touchStartX = 0;
@@ -100,7 +106,7 @@ class ReadAlongReader {
 
         // Book catalog for URL-based loading
         this.booksCatalog = {
-            'the-intelligent-investor': '../output/readalong/the-intelligent-investor'
+            'the-intelligent-investor': '../output/readalong/The_Intelligent_Investor'
         };
 
         // Initialize
@@ -504,12 +510,40 @@ class ReadAlongReader {
 
         // Skip buttons
         document.getElementById('skip-back').addEventListener('click', () => {
-            this.audio.currentTime = Math.max(0, this.audio.currentTime - 10);
+            if (this.browserTTSMode) {
+                // Skip back 3 sentences in TTS mode
+                const wasPlaying = speechSynthesis.speaking && !speechSynthesis.paused;
+                speechSynthesis.cancel();
+                this.ttsCurrentIndex = Math.max(0, this.ttsCurrentIndex - 3);
+                this.currentSentenceIndex = -1;
+                this.resetPlayedState(this.ttsCurrentIndex);
+                this.updateHighlighting(-1, this.ttsCurrentIndex);
+                this.currentSentenceIndex = this.ttsCurrentIndex;
+                this._ttsUpdateProgress();
+                if (wasPlaying) this._ttsSpeakNext();
+            } else {
+                this.audio.currentTime = Math.max(0, this.audio.currentTime - 10);
+            }
         });
         document.getElementById('skip-forward').addEventListener('click', () => {
-            const duration = this.audio.duration;
-            const newTime = this.audio.currentTime + 30;
-            this.audio.currentTime = (duration && isFinite(duration)) ? Math.min(duration, newTime) : newTime;
+            if (this.browserTTSMode) {
+                // Skip forward 5 sentences in TTS mode
+                const chapter = this.timingData.chapters[this.currentChapter];
+                if (chapter) {
+                    const wasPlaying = speechSynthesis.speaking && !speechSynthesis.paused;
+                    speechSynthesis.cancel();
+                    this.ttsCurrentIndex = Math.min(chapter.entries.length - 1, this.ttsCurrentIndex + 5);
+                    this.currentSentenceIndex = -1;
+                    this.updateHighlighting(-1, this.ttsCurrentIndex);
+                    this.currentSentenceIndex = this.ttsCurrentIndex;
+                    this._ttsUpdateProgress();
+                    if (wasPlaying) this._ttsSpeakNext();
+                }
+            } else {
+                const duration = this.audio.duration;
+                const newTime = this.audio.currentTime + 30;
+                this.audio.currentTime = (duration && isFinite(duration)) ? Math.min(duration, newTime) : newTime;
+            }
         });
 
         // Progress bar - mouse events
@@ -811,6 +845,14 @@ class ReadAlongReader {
         const savedProgress = this.getSavedProgress();
         if (savedProgress) {
             this.loadChapter(savedProgress.chapter, savedProgress.position);
+            // Restore TTS sentence position if in TTS mode
+            if (this.browserTTSMode && savedProgress.ttsSentenceIndex) {
+                this.ttsCurrentIndex = savedProgress.ttsSentenceIndex;
+                this.currentSentenceIndex = -1;
+                this.updateHighlighting(-1, this.ttsCurrentIndex);
+                this.currentSentenceIndex = this.ttsCurrentIndex;
+                this._ttsUpdateProgress();
+            }
             this.showToast('Resumed from where you left off');
         } else {
             this.loadChapter(0);
@@ -847,22 +889,49 @@ class ReadAlongReader {
         // Prefer MP3 for faster loading, fall back to WAV
         const mp3FileName = audioFileName.replace(/\.wav$/i, '.mp3');
 
+        // Check if already in browser TTS mode (audio files unavailable)
+        if (this.browserTTSMode) {
+            // Stop any current TTS speech
+            speechSynthesis.cancel();
+            this.ttsCurrentIndex = 0;
+            this.updatePlayState(false);
+            this.totalTimeEl.textContent = 'TTS';
+        }
         // Check if loading from URL (audioBasePath) or from folder (audioFiles)
-        if (this.audioBasePath) {
-            // Try MP3 first, fall back to WAV
+        else if (this.audioBasePath) {
+            // Try MP3 first, fall back to WAV, then fall back to browser TTS
             const mp3Url = `${this.audioBasePath}/audio/${mp3FileName}`;
             const wavUrl = `${this.audioBasePath}/audio/${audioFileName}`;
 
-            this.audio.preload = 'auto';
-            this.audio.src = mp3Url;
-            this.audio.addEventListener('error', () => {
-                if (this.audio.src.endsWith('.mp3')) {
-                    this.audio.src = wavUrl;
+            // Proactively check if audio file exists (HEAD request)
+            // This avoids race conditions where user clicks Play before error fires
+            let audioAvailable = false;
+            try {
+                const headResp = await fetch(mp3Url, { method: 'HEAD' });
+                if (headResp.ok) {
+                    this.audio.preload = 'auto';
+                    this.audio.src = mp3Url;
+                    audioAvailable = true;
+                } else {
+                    // MP3 not found, try WAV
+                    const wavResp = await fetch(wavUrl, { method: 'HEAD' });
+                    if (wavResp.ok) {
+                        this.audio.preload = 'auto';
+                        this.audio.src = wavUrl;
+                        audioAvailable = true;
+                    }
                 }
-            }, { once: true });
+            } catch (e) {
+                // Network error — try setting src and let browser handle it
+                this.audio.preload = 'auto';
+                this.audio.src = mp3Url;
+                audioAvailable = true; // optimistic
+            }
 
-            // Wait for audio to load then seek
-            if (startPosition > 0) {
+            if (!audioAvailable) {
+                // Neither MP3 nor WAV exists — switch to browser TTS
+                this._enableBrowserTTS();
+            } else if (startPosition > 0) {
                 this.audio.addEventListener('loadedmetadata', () => {
                     this.audio.currentTime = startPosition;
                 }, { once: true });
@@ -878,6 +947,9 @@ class ReadAlongReader {
                     this.audio.currentTime = startPosition;
                 }, { once: true });
             }
+        } else {
+            // No audio source at all — switch to browser TTS
+            this._enableBrowserTTS();
         }
 
         // Reset progress
@@ -1124,6 +1196,22 @@ class ReadAlongReader {
         const entryIndex = chapter.entries.findIndex(e => e.id === sentenceId);
         if (entryIndex === -1) return;
 
+        // Handle browser TTS mode
+        if (this.browserTTSMode) {
+            const wasPlaying = speechSynthesis.speaking && !speechSynthesis.paused;
+            speechSynthesis.cancel();
+            this.ttsCurrentIndex = entryIndex;
+            this.resetPlayedState(entryIndex);
+            this.currentSentenceIndex = -1;
+            this.updateHighlighting(-1, entryIndex);
+            this.currentSentenceIndex = entryIndex;
+            this._ttsUpdateProgress();
+            if (wasPlaying) {
+                this._ttsSpeakNext();
+            }
+            return;
+        }
+
         console.log(`[Reader] Seek to sentence ${sentenceId} (index ${entryIndex})`);
 
         // Cancel any pending seek to prevent overlapping seeks
@@ -1178,6 +1266,25 @@ class ReadAlongReader {
     seekToPosition(clientX) {
         const rect = this.progressBar.getBoundingClientRect();
         const percent = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+
+        if (this.browserTTSMode) {
+            // In TTS mode, seek to sentence by percentage
+            const chapter = this.timingData?.chapters?.[this.currentChapter];
+            if (chapter && chapter.entries) {
+                const wasPlaying = speechSynthesis.speaking && !speechSynthesis.paused;
+                speechSynthesis.cancel();
+                const idx = Math.floor(percent * chapter.entries.length);
+                this.ttsCurrentIndex = Math.min(idx, chapter.entries.length - 1);
+                this.currentSentenceIndex = -1;
+                this.resetPlayedState(this.ttsCurrentIndex);
+                this.updateHighlighting(-1, this.ttsCurrentIndex);
+                this.currentSentenceIndex = this.ttsCurrentIndex;
+                this._ttsUpdateProgress();
+                if (wasPlaying) this._ttsSpeakNext();
+            }
+            return;
+        }
+
         const duration = this.audio.duration;
         if (duration && isFinite(duration)) {
             this.audio.currentTime = percent * duration;
@@ -1267,8 +1374,21 @@ class ReadAlongReader {
      * Toggle play/pause
      */
     togglePlay() {
+        if (this.browserTTSMode) {
+            this.ttsToggle();
+            return;
+        }
         if (this.audio.paused) {
-            this.audio.play();
+            const playPromise = this.audio.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(() => {
+                    // Audio source unavailable — switch to browser TTS
+                    if (!this.browserTTSMode) {
+                        this._enableBrowserTTS();
+                    }
+                    this.ttsToggle();
+                });
+            }
         } else {
             this.audio.pause();
         }
@@ -1297,7 +1417,12 @@ class ReadAlongReader {
         // Auto-advance to next chapter
         if (this.currentChapter < this.timingData.chapters.length - 1) {
             this.loadChapter(this.currentChapter + 1);
-            this.audio.play();
+            if (this.browserTTSMode) {
+                // Auto-play TTS for next chapter
+                setTimeout(() => this._ttsSpeakNext(), 300);
+            } else {
+                this.audio.play();
+            }
         }
     }
 
@@ -1398,6 +1523,13 @@ class ReadAlongReader {
             btn.classList.toggle('active', parseFloat(btn.dataset.speed) === speed);
         });
 
+        // If TTS is speaking, restart with new speed
+        if (this.browserTTSMode && speechSynthesis.speaking) {
+            const idx = this.ttsCurrentIndex;
+            speechSynthesis.cancel();
+            this._ttsSpeakFromIndex(idx);
+        }
+
         this.saveSettings();
     }
 
@@ -1441,10 +1573,39 @@ class ReadAlongReader {
                 this.togglePlay();
                 break;
             case 'ArrowLeft':
-                this.audio.currentTime = Math.max(0, this.audio.currentTime - 5);
+                if (this.browserTTSMode) {
+                    // Skip back 1 sentence in TTS mode
+                    if (this.ttsCurrentIndex > 0) {
+                        const wasPlaying = speechSynthesis.speaking && !speechSynthesis.paused;
+                        speechSynthesis.cancel();
+                        this.ttsCurrentIndex = Math.max(0, this.ttsCurrentIndex - 1);
+                        this.currentSentenceIndex = -1;
+                        this.updateHighlighting(-1, this.ttsCurrentIndex);
+                        this.currentSentenceIndex = this.ttsCurrentIndex;
+                        this._ttsUpdateProgress();
+                        if (wasPlaying) this._ttsSpeakNext();
+                    }
+                } else {
+                    this.audio.currentTime = Math.max(0, this.audio.currentTime - 5);
+                }
                 break;
             case 'ArrowRight':
-                this.audio.currentTime = Math.min(this.audio.duration, this.audio.currentTime + 5);
+                if (this.browserTTSMode) {
+                    // Skip forward 1 sentence in TTS mode
+                    const chapter = this.timingData.chapters[this.currentChapter];
+                    if (chapter && this.ttsCurrentIndex < chapter.entries.length - 1) {
+                        const wasPlaying = speechSynthesis.speaking && !speechSynthesis.paused;
+                        speechSynthesis.cancel();
+                        this.ttsCurrentIndex++;
+                        this.currentSentenceIndex = -1;
+                        this.updateHighlighting(-1, this.ttsCurrentIndex);
+                        this.currentSentenceIndex = this.ttsCurrentIndex;
+                        this._ttsUpdateProgress();
+                        if (wasPlaying) this._ttsSpeakNext();
+                    }
+                } else {
+                    this.audio.currentTime = Math.min(this.audio.duration, this.audio.currentTime + 5);
+                }
                 break;
             case 'ArrowUp':
                 event.preventDefault();
@@ -2163,7 +2324,8 @@ class ReadAlongReader {
         const progress = {
             bookId: this.bookData.bookId,
             chapter: this.currentChapter,
-            position: this.audio.currentTime,
+            position: this.browserTTSMode ? 0 : this.audio.currentTime,
+            ttsSentenceIndex: this.browserTTSMode ? this.ttsCurrentIndex : undefined,
             updatedAt: Date.now()
         };
 
@@ -2344,6 +2506,145 @@ class ReadAlongReader {
         if (this.pageNextBtn) {
             this.pageNextBtn.disabled = this.currentPage >= this.totalPages;
         }
+    }
+
+    // ==================== BROWSER TTS FALLBACK ====================
+
+    /**
+     * Enable browser TTS mode when audio files are missing.
+     * Uses the Web Speech API (speechSynthesis) to read text aloud.
+     */
+    _enableBrowserTTS() {
+        if (this.browserTTSMode) return;
+
+        this.browserTTSMode = true;
+        this.ttsCurrentIndex = 0;
+        this.totalTimeEl.textContent = 'TTS';
+        console.log('[Reader] Audio files not available — browser TTS enabled');
+        this.showToast('Using browser voice (audio not yet generated)');
+
+        // Pre-select a good voice
+        this._pickTTSVoice();
+
+        // voices might load async in some browsers
+        if (speechSynthesis.onvoiceschanged !== undefined) {
+            speechSynthesis.onvoiceschanged = () => this._pickTTSVoice();
+        }
+    }
+
+    /**
+     * Pick the best available TTS voice.
+     */
+    _pickTTSVoice() {
+        const voices = speechSynthesis.getVoices();
+        if (voices.length === 0) return;
+
+        // Prefer natural / enhanced English voices
+        const preferred = [
+            'Google US English', 'Google UK English Male',
+            'Microsoft David', 'Microsoft Mark', 'Microsoft Zira',
+            'Alex', 'Daniel', 'Samantha'
+        ];
+
+        for (const name of preferred) {
+            const v = voices.find(v => v.name.includes(name));
+            if (v) { this._ttsVoice = v; return; }
+        }
+
+        // Fall back to first English voice
+        const english = voices.find(v => v.lang.startsWith('en'));
+        if (english) { this._ttsVoice = english; return; }
+
+        // Last resort: first available voice
+        this._ttsVoice = voices[0];
+    }
+
+    /**
+     * Toggle TTS play/pause
+     */
+    ttsToggle() {
+        if (speechSynthesis.speaking && !speechSynthesis.paused) {
+            speechSynthesis.pause();
+            this.updatePlayState(false);
+        } else if (speechSynthesis.paused) {
+            speechSynthesis.resume();
+            this.updatePlayState(true);
+        } else {
+            this._ttsSpeakFromIndex(this.ttsCurrentIndex);
+        }
+    }
+
+    /**
+     * Start TTS from a specific sentence index
+     */
+    _ttsSpeakFromIndex(index) {
+        speechSynthesis.cancel();
+        const chapter = this.timingData.chapters[this.currentChapter];
+        if (!chapter || !chapter.entries || index >= chapter.entries.length) return;
+
+        this.ttsCurrentIndex = index;
+        this._ttsSpeakNext();
+    }
+
+    /**
+     * Speak the next sentence in the queue
+     */
+    _ttsSpeakNext() {
+        const chapter = this.timingData.chapters[this.currentChapter];
+        if (!chapter || !chapter.entries) return;
+
+        if (this.ttsCurrentIndex >= chapter.entries.length) {
+            // Chapter finished
+            this.updatePlayState(false);
+            this._ttsUpdateProgress();
+            this.onChapterEnd();
+            return;
+        }
+
+        const entry = chapter.entries[this.ttsCurrentIndex];
+        const utterance = new SpeechSynthesisUtterance(entry.text);
+        utterance.rate = this.playbackSpeed;
+        utterance.pitch = 1.0;
+        if (this._ttsVoice) utterance.voice = this._ttsVoice;
+
+        // Highlight current sentence
+        const prevIndex = this.currentSentenceIndex;
+        this.currentSentenceIndex = this.ttsCurrentIndex;
+        this.updateHighlighting(prevIndex, this.ttsCurrentIndex);
+        this._ttsUpdateProgress();
+
+        utterance.onend = () => {
+            this.ttsCurrentIndex++;
+            this._ttsSpeakNext();
+        };
+
+        utterance.onerror = (e) => {
+            if (e.error !== 'interrupted' && e.error !== 'canceled') {
+                console.warn('[TTS] Error on sentence', this.ttsCurrentIndex, e.error);
+                this.ttsCurrentIndex++;
+                this._ttsSpeakNext();
+            }
+        };
+
+        this.ttsUtterance = utterance;
+        speechSynthesis.speak(utterance);
+        this.updatePlayState(true);
+    }
+
+    /**
+     * Update progress display for TTS mode (sentence-based progress)
+     */
+    _ttsUpdateProgress() {
+        const chapter = this.timingData.chapters[this.currentChapter];
+        if (!chapter || !chapter.entries || chapter.entries.length === 0) return;
+
+        const total = chapter.entries.length;
+        const current = this.ttsCurrentIndex;
+        const percent = (current / total) * 100;
+
+        this.progressFill.style.width = `${percent}%`;
+        this.progressHandle.style.left = `${percent}%`;
+        this.currentTimeEl.textContent = `${current + 1}/${total}`;
     }
 
     // ==================== SETTINGS ====================
