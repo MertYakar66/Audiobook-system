@@ -28,6 +28,10 @@ venv/
 ENV/
 env/
 .venv/
+tts_venv/
+
+# Redundant nested repos
+Audiobook-system/
 
 # IDE
 .idea/
