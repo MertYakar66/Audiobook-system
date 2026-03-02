@@ -609,7 +609,13 @@ class ReadAlongReader {
             this.exportNotesAndHighlights();
         });
 
-        // Add bookmark button
+        // Player action buttons: Highlight, Note, Save
+        document.getElementById('highlight-btn').addEventListener('click', () => {
+            this.highlightActiveSentence();
+        });
+        document.getElementById('note-btn').addEventListener('click', () => {
+            this.noteCurrentSentence();
+        });
         document.getElementById('bookmark-btn').addEventListener('click', () => {
             this.addBookmark();
         });
@@ -1482,7 +1488,106 @@ class ReadAlongReader {
             case 'KeyP':
                 this.togglePageView();
                 break;
+            case 'KeyH':
+                this.highlightActiveSentence();
+                break;
+            case 'KeyN':
+                this.noteCurrentSentence();
+                break;
         }
+    }
+
+    // ==================== PLAYER ACTION BUTTONS ====================
+
+    /**
+     * Get the current active sentence info (used by player action buttons)
+     */
+    getCurrentSentenceInfo() {
+        const chapter = this.timingData?.chapters?.[this.currentChapter];
+        if (!chapter || this.currentSentenceIndex < 0 || this.currentSentenceIndex >= chapter.entries.length) {
+            return null;
+        }
+        const entry = chapter.entries[this.currentSentenceIndex];
+        return {
+            id: entry.id || `s${this.currentChapter}-${this.currentSentenceIndex}`,
+            text: entry.text || '',
+            index: this.currentSentenceIndex,
+            chapterTitle: chapter.title || `Chapter ${this.currentChapter + 1}`
+        };
+    }
+
+    /**
+     * Flash an action button for visual feedback
+     */
+    flashButton(btnId) {
+        const btn = document.getElementById(btnId);
+        if (!btn) return;
+        btn.classList.remove('flash');
+        // Force reflow so re-adding the class triggers the animation
+        void btn.offsetWidth;
+        btn.classList.add('flash');
+        setTimeout(() => btn.classList.remove('flash'), 500);
+    }
+
+    /**
+     * Highlight the currently playing sentence (player button)
+     */
+    highlightActiveSentence() {
+        const info = this.getCurrentSentenceInfo();
+        if (!info) {
+            this.showToast('Play audio first to select a sentence');
+            return;
+        }
+        if (!this.bookData) return;
+
+        const chapter = this.timingData.chapters[this.currentChapter];
+        const highlight = {
+            id: Date.now().toString(),
+            bookId: this.bookData.bookId,
+            chapter: this.currentChapter,
+            chapterTitle: info.chapterTitle,
+            audioTime: this.audio?.currentTime || 0,
+            sentenceId: info.id,
+            text: info.text,
+            color: this.selectedHighlightColor || 'yellow',
+            createdAt: new Date().toISOString()
+        };
+
+        this.highlights.push(highlight);
+        this.saveBookData();
+        this.renderHighlights();
+
+        // Apply highlight style to DOM
+        const el = document.querySelector(`[data-id="${info.id}"]`);
+        if (el) {
+            el.classList.add('highlighted');
+            el.dataset.highlightColor = highlight.color;
+            const colorObj = this.highlightColors.find(c => c.name === highlight.color);
+            if (colorObj) {
+                el.style.backgroundColor = colorObj.color;
+            }
+        }
+
+        this.flashButton('highlight-btn');
+        this.showToast(`Highlighted in ${highlight.color}`);
+    }
+
+    /**
+     * Open notes modal for the currently playing sentence (player button)
+     */
+    noteCurrentSentence() {
+        const info = this.getCurrentSentenceInfo();
+        if (!info) {
+            this.showToast('Play audio first to select a sentence');
+            return;
+        }
+
+        // Set the selection state so saveNote() can use it
+        this.selectedText = info.text;
+        this.selectedSentenceId = info.id;
+
+        this.flashButton('note-btn');
+        this.openNotesModal(info.text);
     }
 
     // ==================== BOOKMARKS ====================
@@ -1513,11 +1618,8 @@ class ReadAlongReader {
         this.updateBookmarkMarkers();
         this.showToast('Bookmark added');
 
-        // Flash the bookmark button
-        document.getElementById('bookmark-btn').classList.add('active');
-        setTimeout(() => {
-            document.getElementById('bookmark-btn').classList.remove('active');
-        }, 500);
+        // Flash the Save button
+        this.flashButton('bookmark-btn');
     }
 
     /**
