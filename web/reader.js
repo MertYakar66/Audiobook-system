@@ -65,12 +65,6 @@ class ReadAlongReader {
         this.selectedSentenceId = null;
         this.selectionRange = null;
 
-        // Browser TTS fallback (used when audio files are missing)
-        this.browserTTSMode = false;
-        this.ttsCurrentIndex = 0;
-        this.ttsUtterance = null;
-        this._ttsVoice = null;
-
         // Mobile/touch state
         this.isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
         this.touchStartX = 0;
@@ -510,40 +504,12 @@ class ReadAlongReader {
 
         // Skip buttons
         document.getElementById('skip-back').addEventListener('click', () => {
-            if (this.browserTTSMode) {
-                // Skip back 3 sentences in TTS mode
-                const wasPlaying = speechSynthesis.speaking && !speechSynthesis.paused;
-                speechSynthesis.cancel();
-                this.ttsCurrentIndex = Math.max(0, this.ttsCurrentIndex - 3);
-                this.currentSentenceIndex = -1;
-                this.resetPlayedState(this.ttsCurrentIndex);
-                this.updateHighlighting(-1, this.ttsCurrentIndex);
-                this.currentSentenceIndex = this.ttsCurrentIndex;
-                this._ttsUpdateProgress();
-                if (wasPlaying) this._ttsSpeakNext();
-            } else {
-                this.audio.currentTime = Math.max(0, this.audio.currentTime - 10);
-            }
+            this.audio.currentTime = Math.max(0, this.audio.currentTime - 10);
         });
         document.getElementById('skip-forward').addEventListener('click', () => {
-            if (this.browserTTSMode) {
-                // Skip forward 5 sentences in TTS mode
-                const chapter = this.timingData.chapters[this.currentChapter];
-                if (chapter) {
-                    const wasPlaying = speechSynthesis.speaking && !speechSynthesis.paused;
-                    speechSynthesis.cancel();
-                    this.ttsCurrentIndex = Math.min(chapter.entries.length - 1, this.ttsCurrentIndex + 5);
-                    this.currentSentenceIndex = -1;
-                    this.updateHighlighting(-1, this.ttsCurrentIndex);
-                    this.currentSentenceIndex = this.ttsCurrentIndex;
-                    this._ttsUpdateProgress();
-                    if (wasPlaying) this._ttsSpeakNext();
-                }
-            } else {
-                const duration = this.audio.duration;
-                const newTime = this.audio.currentTime + 30;
-                this.audio.currentTime = (duration && isFinite(duration)) ? Math.min(duration, newTime) : newTime;
-            }
+            const duration = this.audio.duration;
+            const newTime = this.audio.currentTime + 30;
+            this.audio.currentTime = (duration && isFinite(duration)) ? Math.min(duration, newTime) : newTime;
         });
 
         // Progress bar - mouse events
@@ -836,8 +802,12 @@ class ReadAlongReader {
             this.chapterSelect.appendChild(option);
         });
 
-        // Show reader view
-        document.getElementById('empty-state').classList.remove('active');
+        // Show reader view — hide all state overlays explicitly
+        const emptyState = document.getElementById('empty-state');
+        emptyState.classList.remove('active');
+        emptyState.style.display = 'none';
+        const loadingState = document.getElementById('loading-state');
+        if (loadingState) loadingState.style.display = 'none';
         document.getElementById('reader-view').style.display = 'block';
         document.getElementById('player').style.display = 'block';
 
@@ -948,8 +918,20 @@ class ReadAlongReader {
         const fragment = document.createDocumentFragment();
 
         chapterData.paragraphs.forEach(paragraph => {
-            const paraEl = document.createElement('p');
-            paraEl.className = 'paragraph';
+            // Determine element type based on heading metadata
+            const isHeading = paragraph.isHeading || false;
+            const style = paragraph.style || '';
+            let paraEl;
+
+            if (isHeading) {
+                // Use h2 for main chapter headings, h3 for sub-headings
+                const isMainHeading = style === 'Heading 2' || style === 'Heading 1';
+                paraEl = document.createElement(isMainHeading ? 'h2' : 'h3');
+                paraEl.className = 'chapter-heading';
+            } else {
+                paraEl = document.createElement('p');
+                paraEl.className = 'paragraph';
+            }
             paraEl.dataset.id = paragraph.id;
 
             paragraph.sentences.forEach(sentence => {
@@ -1158,22 +1140,6 @@ class ReadAlongReader {
         const entryIndex = chapter.entries.findIndex(e => e.id === sentenceId);
         if (entryIndex === -1) return;
 
-        // Handle browser TTS mode
-        if (this.browserTTSMode) {
-            const wasPlaying = speechSynthesis.speaking && !speechSynthesis.paused;
-            speechSynthesis.cancel();
-            this.ttsCurrentIndex = entryIndex;
-            this.resetPlayedState(entryIndex);
-            this.currentSentenceIndex = -1;
-            this.updateHighlighting(-1, entryIndex);
-            this.currentSentenceIndex = entryIndex;
-            this._ttsUpdateProgress();
-            if (wasPlaying) {
-                this._ttsSpeakNext();
-            }
-            return;
-        }
-
         console.log(`[Reader] Seek to sentence ${sentenceId} (index ${entryIndex})`);
 
         // Cancel any pending seek to prevent overlapping seeks
@@ -1228,25 +1194,6 @@ class ReadAlongReader {
     seekToPosition(clientX) {
         const rect = this.progressBar.getBoundingClientRect();
         const percent = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-
-        if (this.browserTTSMode) {
-            // In TTS mode, seek to sentence by percentage
-            const chapter = this.timingData?.chapters?.[this.currentChapter];
-            if (chapter && chapter.entries) {
-                const wasPlaying = speechSynthesis.speaking && !speechSynthesis.paused;
-                speechSynthesis.cancel();
-                const idx = Math.floor(percent * chapter.entries.length);
-                this.ttsCurrentIndex = Math.min(idx, chapter.entries.length - 1);
-                this.currentSentenceIndex = -1;
-                this.resetPlayedState(this.ttsCurrentIndex);
-                this.updateHighlighting(-1, this.ttsCurrentIndex);
-                this.currentSentenceIndex = this.ttsCurrentIndex;
-                this._ttsUpdateProgress();
-                if (wasPlaying) this._ttsSpeakNext();
-            }
-            return;
-        }
-
         const duration = this.audio.duration;
         if (duration && isFinite(duration)) {
             this.audio.currentTime = percent * duration;
@@ -1336,21 +1283,8 @@ class ReadAlongReader {
      * Toggle play/pause
      */
     togglePlay() {
-        if (this.browserTTSMode) {
-            this.ttsToggle();
-            return;
-        }
         if (this.audio.paused) {
-            const playPromise = this.audio.play();
-            if (playPromise !== undefined) {
-                playPromise.catch(() => {
-                    // Audio source unavailable — switch to browser TTS
-                    if (!this.browserTTSMode) {
-                        this._enableBrowserTTS();
-                    }
-                    this.ttsToggle();
-                });
-            }
+            this.audio.play();
         } else {
             this.audio.pause();
         }
@@ -1379,12 +1313,7 @@ class ReadAlongReader {
         // Auto-advance to next chapter
         if (this.currentChapter < this.timingData.chapters.length - 1) {
             this.loadChapter(this.currentChapter + 1);
-            if (this.browserTTSMode) {
-                // Auto-play TTS for next chapter
-                setTimeout(() => this._ttsSpeakNext(), 300);
-            } else {
-                this.audio.play();
-            }
+            this.audio.play();
         }
     }
 
@@ -1485,13 +1414,6 @@ class ReadAlongReader {
             btn.classList.toggle('active', parseFloat(btn.dataset.speed) === speed);
         });
 
-        // If TTS is speaking, restart with new speed
-        if (this.browserTTSMode && speechSynthesis.speaking) {
-            const idx = this.ttsCurrentIndex;
-            speechSynthesis.cancel();
-            this._ttsSpeakFromIndex(idx);
-        }
-
         this.saveSettings();
     }
 
@@ -1517,8 +1439,6 @@ class ReadAlongReader {
         document.querySelectorAll('.theme-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.theme === theme);
         });
-        // Sync theme across library and reader
-        localStorage.setItem('scriptum-theme', theme);
         this.saveSettings();
     }
 
@@ -1535,39 +1455,10 @@ class ReadAlongReader {
                 this.togglePlay();
                 break;
             case 'ArrowLeft':
-                if (this.browserTTSMode) {
-                    // Skip back 1 sentence in TTS mode
-                    if (this.ttsCurrentIndex > 0) {
-                        const wasPlaying = speechSynthesis.speaking && !speechSynthesis.paused;
-                        speechSynthesis.cancel();
-                        this.ttsCurrentIndex = Math.max(0, this.ttsCurrentIndex - 1);
-                        this.currentSentenceIndex = -1;
-                        this.updateHighlighting(-1, this.ttsCurrentIndex);
-                        this.currentSentenceIndex = this.ttsCurrentIndex;
-                        this._ttsUpdateProgress();
-                        if (wasPlaying) this._ttsSpeakNext();
-                    }
-                } else {
-                    this.audio.currentTime = Math.max(0, this.audio.currentTime - 5);
-                }
+                this.audio.currentTime = Math.max(0, this.audio.currentTime - 5);
                 break;
             case 'ArrowRight':
-                if (this.browserTTSMode) {
-                    // Skip forward 1 sentence in TTS mode
-                    const chapter = this.timingData.chapters[this.currentChapter];
-                    if (chapter && this.ttsCurrentIndex < chapter.entries.length - 1) {
-                        const wasPlaying = speechSynthesis.speaking && !speechSynthesis.paused;
-                        speechSynthesis.cancel();
-                        this.ttsCurrentIndex++;
-                        this.currentSentenceIndex = -1;
-                        this.updateHighlighting(-1, this.ttsCurrentIndex);
-                        this.currentSentenceIndex = this.ttsCurrentIndex;
-                        this._ttsUpdateProgress();
-                        if (wasPlaying) this._ttsSpeakNext();
-                    }
-                } else {
-                    this.audio.currentTime = Math.min(this.audio.duration, this.audio.currentTime + 5);
-                }
+                this.audio.currentTime = Math.min(this.audio.duration, this.audio.currentTime + 5);
                 break;
             case 'ArrowUp':
                 event.preventDefault();
@@ -1661,8 +1552,6 @@ class ReadAlongReader {
     renderBookmarks() {
         const container = document.getElementById('bookmarks-list');
         const bookBookmarks = this.bookmarks.filter(b => b.bookId === this.bookData?.bookId);
-
-        this._updateTabBadges();
 
         if (bookBookmarks.length === 0) {
             container.innerHTML = '<p class="empty-message">No bookmarks yet. Click the bookmark button while listening to add one.</p>';
@@ -1767,17 +1656,13 @@ class ReadAlongReader {
         const noteText = document.getElementById('note-input').value.trim();
         if (!noteText && !this.selectedText) return;
 
-        const chapter = this.timingData?.chapters?.[this.currentChapter];
         const note = {
             id: Date.now().toString(),
             bookId: this.bookData.bookId,
             chapter: this.currentChapter,
-            chapterTitle: chapter?.title || `Chapter ${this.currentChapter + 1}`,
-            audioTime: this.audio?.currentTime || 0,
             sentenceId: this.selectedSentenceId,
             selectedText: this.selectedText,
             note: noteText,
-            color: this.selectedHighlightColor,
             createdAt: new Date().toISOString()
         };
 
@@ -1799,13 +1684,10 @@ class ReadAlongReader {
     addHighlight() {
         if (!this.selectedSentenceId || !this.bookData) return;
 
-        const chapter = this.timingData?.chapters?.[this.currentChapter];
         const highlight = {
             id: Date.now().toString(),
             bookId: this.bookData.bookId,
             chapter: this.currentChapter,
-            chapterTitle: chapter?.title || `Chapter ${this.currentChapter + 1}`,
-            audioTime: this.audio?.currentTime || 0,
             sentenceId: this.selectedSentenceId,
             text: this.selectedText,
             color: this.selectedHighlightColor,
@@ -1853,59 +1735,24 @@ class ReadAlongReader {
         const container = document.getElementById('notes-list');
         const bookNotes = this.notes.filter(n => n.bookId === this.bookData?.bookId);
 
-        this._updateTabBadges();
-
         if (bookNotes.length === 0) {
-            container.innerHTML = `
-                <div class="empty-state-card">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="40" height="40">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                        <polyline points="14 2 14 8 20 8"/>
-                        <line x1="16" y1="13" x2="8" y2="13"/>
-                        <line x1="16" y1="17" x2="8" y2="17"/>
-                    </svg>
-                    <p>No notes yet</p>
-                    <span>Select text and tap the note icon to add one</span>
-                </div>`;
+            container.innerHTML = '<p class="empty-message">No notes yet. Select text to add a note.</p>';
             return;
         }
 
-        container.innerHTML = bookNotes.map(n => {
-            const colorObj = this.highlightColors.find(c => c.name === (n.color || 'yellow'));
-            const borderColor = colorObj ? colorObj.color : '#fff59d';
-            const dateStr = this._formatDate(n.createdAt);
-            const chTitle = n.chapterTitle || `Chapter ${n.chapter + 1}`;
-            const audioStr = n.audioTime ? this.formatTime(n.audioTime) : null;
-            return `
-                <div class="annotation-card" data-id="${n.id}" style="border-left: 4px solid ${borderColor}">
-                    <button class="annotation-delete" onclick="event.stopPropagation(); reader.removeNote('${n.id}')" title="Delete">×</button>
-                    <div class="annotation-meta">
-                        <span class="annotation-chapter">${chTitle}</span>
-                        ${audioStr ? `<span class="annotation-time" data-time="${n.audioTime}" data-chapter="${n.chapter}" title="Jump to this time">&#9202; ${audioStr}</span>` : ''}
-                    </div>
-                    <div class="annotation-quote">"${n.selectedText.substring(0, 150)}${n.selectedText.length > 150 ? '...' : ''}"</div>
-                    <div class="annotation-note">${n.note}</div>
-                    <div class="annotation-date">${dateStr}</div>
-                </div>`;
-        }).join('');
+        container.innerHTML = bookNotes.map(n => `
+            <div class="note-item" data-id="${n.id}">
+                <button class="note-delete" onclick="event.stopPropagation(); reader.removeNote('${n.id}')">Delete</button>
+                <div class="note-chapter">Chapter ${n.chapter + 1}</div>
+                <div class="note-text">"${n.selectedText.substring(0, 80)}${n.selectedText.length > 80 ? '...' : ''}"</div>
+                <div class="note-content">${n.note}</div>
+                <div class="note-date">${new Date(n.createdAt).toLocaleDateString()}</div>
+            </div>
+        `).join('');
 
-        // Click handlers
-        container.querySelectorAll('.annotation-card').forEach(item => {
-            item.addEventListener('click', (e) => {
-                // Handle audio timestamp click
-                const timeEl = e.target.closest('.annotation-time');
-                if (timeEl) {
-                    const time = parseFloat(timeEl.dataset.time);
-                    const ch = parseInt(timeEl.dataset.chapter);
-                    if (ch !== this.currentChapter) {
-                        this.loadChapter(ch, time);
-                    } else {
-                        this.audio.currentTime = time;
-                    }
-                    document.getElementById('bookmarks-panel').classList.remove('open');
-                    return;
-                }
-
+        // Add click handlers to jump to note location
+        container.querySelectorAll('.note-item').forEach(item => {
+            item.addEventListener('click', () => {
                 const note = this.notes.find(n => n.id === item.dataset.id);
                 if (note) {
                     if (note.chapter !== this.currentChapter) {
@@ -1915,8 +1762,8 @@ class ReadAlongReader {
                         const el = document.querySelector(`[data-id="${note.sentenceId}"]`);
                         if (el) {
                             el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                            el.classList.add('flash');
-                            setTimeout(() => el.classList.remove('flash'), 1500);
+                            el.classList.add('active');
+                            setTimeout(() => el.classList.remove('active'), 2000);
                         }
                     }, 500);
                     document.getElementById('bookmarks-panel').classList.remove('open');
@@ -1934,54 +1781,27 @@ class ReadAlongReader {
 
         const bookHighlights = this.highlights.filter(h => h.bookId === this.bookData?.bookId);
 
-        this._updateTabBadges();
-
         if (bookHighlights.length === 0) {
-            container.innerHTML = `
-                <div class="empty-state-card">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="40" height="40">
-                        <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-                    </svg>
-                    <p>No highlights yet</p>
-                    <span>Select text and pick a color to highlight</span>
-                </div>`;
+            container.innerHTML = '<p class="empty-message">No highlights yet. Select text to highlight.</p>';
             return;
         }
 
         container.innerHTML = bookHighlights.map(h => {
             const colorObj = this.highlightColors.find(c => c.name === (h.color || 'yellow'));
             const bgColor = colorObj ? colorObj.color : '#fff59d';
-            const dateStr = this._formatDate(h.createdAt);
-            const chTitle = h.chapterTitle || `Chapter ${h.chapter + 1}`;
-            const audioStr = h.audioTime ? this.formatTime(h.audioTime) : null;
             return `
-                <div class="annotation-card" data-id="${h.id}" style="border-left: 4px solid ${bgColor}">
-                    <button class="annotation-delete" onclick="event.stopPropagation(); reader.removeHighlight('${h.id}')" title="Delete">×</button>
-                    <div class="annotation-meta">
-                        <span class="annotation-chapter">${chTitle}</span>
-                        ${audioStr ? `<span class="annotation-time" data-time="${h.audioTime}" data-chapter="${h.chapter}" title="Jump to this time">&#9202; ${audioStr}</span>` : ''}
-                    </div>
-                    <div class="annotation-quote" style="background: ${bgColor}; color: #1a1a2e;">"${h.text.substring(0, 150)}${h.text.length > 150 ? '...' : ''}"</div>
-                    <div class="annotation-date">${dateStr}</div>
-                </div>`;
+                <div class="highlight-item" data-id="${h.id}" style="border-left: 4px solid ${bgColor}">
+                    <button class="highlight-delete" onclick="event.stopPropagation(); reader.removeHighlight('${h.id}')">Delete</button>
+                    <div class="highlight-chapter">Chapter ${h.chapter + 1}</div>
+                    <div class="highlight-text" style="background: ${bgColor}">"${h.text.substring(0, 100)}${h.text.length > 100 ? '...' : ''}"</div>
+                    <div class="highlight-date">${new Date(h.createdAt).toLocaleDateString()}</div>
+                </div>
+            `;
         }).join('');
 
-        // Click handlers
-        container.querySelectorAll('.annotation-card').forEach(item => {
-            item.addEventListener('click', (e) => {
-                const timeEl = e.target.closest('.annotation-time');
-                if (timeEl) {
-                    const time = parseFloat(timeEl.dataset.time);
-                    const ch = parseInt(timeEl.dataset.chapter);
-                    if (ch !== this.currentChapter) {
-                        this.loadChapter(ch, time);
-                    } else {
-                        this.audio.currentTime = time;
-                    }
-                    document.getElementById('bookmarks-panel').classList.remove('open');
-                    return;
-                }
-
+        // Add click handlers
+        container.querySelectorAll('.highlight-item').forEach(item => {
+            item.addEventListener('click', () => {
                 const highlight = this.highlights.find(h => h.id === item.dataset.id);
                 if (highlight) {
                     if (highlight.chapter !== this.currentChapter) {
@@ -2029,30 +1849,25 @@ class ReadAlongReader {
         const bookNotes = this.notes.filter(n => n.bookId === this.bookData.bookId);
         const bookHighlights = this.highlights.filter(h => h.bookId === this.bookData.bookId);
 
-        let content = `# Notes and Highlights\n\n`;
-        content += `**${this.bookData.title}**\n`;
-        content += `*By ${this.bookData.author}*\n\n`;
-        content += `Exported: ${this._formatDate(new Date().toISOString())}\n\n`;
-        content += `---\n\n`;
+        let content = `# Notes and Highlights\n`;
+        content += `## ${this.bookData.title}\n`;
+        content += `By ${this.bookData.author}\n`;
+        content += `Exported: ${new Date().toLocaleDateString()}\n\n`;
 
         if (bookHighlights.length > 0) {
             content += `## Highlights (${bookHighlights.length})\n\n`;
             bookHighlights.forEach((h, i) => {
-                const chTitle = h.chapterTitle || `Chapter ${h.chapter + 1}`;
-                const audioStr = h.audioTime ? ` | Audio: ${this.formatTime(h.audioTime)}` : '';
-                content += `${i + 1}. > "${h.text}"\n\n`;
-                content += `   *${chTitle}${audioStr} | ${this._formatDate(h.createdAt)}*\n\n`;
+                content += `${i + 1}. "${h.text}"\n`;
+                content += `   - Chapter ${h.chapter + 1}, ${new Date(h.createdAt).toLocaleDateString()}\n\n`;
             });
         }
 
         if (bookNotes.length > 0) {
             content += `## Notes (${bookNotes.length})\n\n`;
             bookNotes.forEach((n, i) => {
-                const chTitle = n.chapterTitle || `Chapter ${n.chapter + 1}`;
-                const audioStr = n.audioTime ? ` | Audio: ${this.formatTime(n.audioTime)}` : '';
-                content += `${i + 1}. > "${n.selectedText}"\n\n`;
-                content += `   **Note:** ${n.note}\n\n`;
-                content += `   *${chTitle}${audioStr} | ${this._formatDate(n.createdAt)}*\n\n`;
+                content += `${i + 1}. "${n.selectedText}"\n`;
+                content += `   Note: ${n.note}\n`;
+                content += `   - Chapter ${n.chapter + 1}, ${new Date(n.createdAt).toLocaleDateString()}\n\n`;
             });
         }
 
@@ -2286,8 +2101,7 @@ class ReadAlongReader {
         const progress = {
             bookId: this.bookData.bookId,
             chapter: this.currentChapter,
-            position: this.browserTTSMode ? 0 : this.audio.currentTime,
-            ttsSentenceIndex: this.browserTTSMode ? this.ttsCurrentIndex : undefined,
+            position: this.audio.currentTime,
             updatedAt: Date.now()
         };
 
@@ -2470,145 +2284,6 @@ class ReadAlongReader {
         }
     }
 
-    // ==================== BROWSER TTS FALLBACK ====================
-
-    /**
-     * Enable browser TTS mode when audio files are missing.
-     * Uses the Web Speech API (speechSynthesis) to read text aloud.
-     */
-    _enableBrowserTTS() {
-        if (this.browserTTSMode) return;
-
-        this.browserTTSMode = true;
-        this.ttsCurrentIndex = 0;
-        this.totalTimeEl.textContent = 'TTS';
-        console.log('[Reader] Audio files not available — browser TTS enabled');
-        this.showToast('Using browser voice (audio not yet generated)');
-
-        // Pre-select a good voice
-        this._pickTTSVoice();
-
-        // voices might load async in some browsers
-        if (speechSynthesis.onvoiceschanged !== undefined) {
-            speechSynthesis.onvoiceschanged = () => this._pickTTSVoice();
-        }
-    }
-
-    /**
-     * Pick the best available TTS voice.
-     */
-    _pickTTSVoice() {
-        const voices = speechSynthesis.getVoices();
-        if (voices.length === 0) return;
-
-        // Prefer natural / enhanced English voices
-        const preferred = [
-            'Google US English', 'Google UK English Male',
-            'Microsoft David', 'Microsoft Mark', 'Microsoft Zira',
-            'Alex', 'Daniel', 'Samantha'
-        ];
-
-        for (const name of preferred) {
-            const v = voices.find(v => v.name.includes(name));
-            if (v) { this._ttsVoice = v; return; }
-        }
-
-        // Fall back to first English voice
-        const english = voices.find(v => v.lang.startsWith('en'));
-        if (english) { this._ttsVoice = english; return; }
-
-        // Last resort: first available voice
-        this._ttsVoice = voices[0];
-    }
-
-    /**
-     * Toggle TTS play/pause
-     */
-    ttsToggle() {
-        if (speechSynthesis.speaking && !speechSynthesis.paused) {
-            speechSynthesis.pause();
-            this.updatePlayState(false);
-        } else if (speechSynthesis.paused) {
-            speechSynthesis.resume();
-            this.updatePlayState(true);
-        } else {
-            this._ttsSpeakFromIndex(this.ttsCurrentIndex);
-        }
-    }
-
-    /**
-     * Start TTS from a specific sentence index
-     */
-    _ttsSpeakFromIndex(index) {
-        speechSynthesis.cancel();
-        const chapter = this.timingData.chapters[this.currentChapter];
-        if (!chapter || !chapter.entries || index >= chapter.entries.length) return;
-
-        this.ttsCurrentIndex = index;
-        this._ttsSpeakNext();
-    }
-
-    /**
-     * Speak the next sentence in the queue
-     */
-    _ttsSpeakNext() {
-        const chapter = this.timingData.chapters[this.currentChapter];
-        if (!chapter || !chapter.entries) return;
-
-        if (this.ttsCurrentIndex >= chapter.entries.length) {
-            // Chapter finished
-            this.updatePlayState(false);
-            this._ttsUpdateProgress();
-            this.onChapterEnd();
-            return;
-        }
-
-        const entry = chapter.entries[this.ttsCurrentIndex];
-        const utterance = new SpeechSynthesisUtterance(entry.text);
-        utterance.rate = this.playbackSpeed;
-        utterance.pitch = 1.0;
-        if (this._ttsVoice) utterance.voice = this._ttsVoice;
-
-        // Highlight current sentence
-        const prevIndex = this.currentSentenceIndex;
-        this.currentSentenceIndex = this.ttsCurrentIndex;
-        this.updateHighlighting(prevIndex, this.ttsCurrentIndex);
-        this._ttsUpdateProgress();
-
-        utterance.onend = () => {
-            this.ttsCurrentIndex++;
-            this._ttsSpeakNext();
-        };
-
-        utterance.onerror = (e) => {
-            if (e.error !== 'interrupted' && e.error !== 'canceled') {
-                console.warn('[TTS] Error on sentence', this.ttsCurrentIndex, e.error);
-                this.ttsCurrentIndex++;
-                this._ttsSpeakNext();
-            }
-        };
-
-        this.ttsUtterance = utterance;
-        speechSynthesis.speak(utterance);
-        this.updatePlayState(true);
-    }
-
-    /**
-     * Update progress display for TTS mode (sentence-based progress)
-     */
-    _ttsUpdateProgress() {
-        const chapter = this.timingData.chapters[this.currentChapter];
-        if (!chapter || !chapter.entries || chapter.entries.length === 0) return;
-
-        const total = chapter.entries.length;
-        const current = this.ttsCurrentIndex;
-        const percent = (current / total) * 100;
-
-        this.progressFill.style.width = `${percent}%`;
-        this.progressHandle.style.left = `${percent}%`;
-        this.currentTimeEl.textContent = `${current + 1}/${total}`;
-    }
-
     // ==================== SETTINGS ====================
 
     /**
@@ -2633,9 +2308,7 @@ class ReadAlongReader {
             const settings = JSON.parse(localStorage.getItem('readalong-settings') || '{}');
 
             if (settings.fontSize) this.setFontSize(settings.fontSize);
-            // Use reader's saved theme, or fall back to library theme for consistency
-            var theme = settings.theme || localStorage.getItem('scriptum-theme') || 'dark';
-            this.setTheme(theme);
+            if (settings.theme) this.setTheme(settings.theme);
             if (settings.speed) this.setSpeed(settings.speed);
             if (settings.autoScroll !== undefined) {
                 this.autoScroll = settings.autoScroll;
@@ -2650,47 +2323,6 @@ class ReadAlongReader {
     }
 
     // ==================== UTILITIES ====================
-
-    /**
-     * Format ISO date string into readable format (e.g. "Feb 17, 2026 at 11:50 AM")
-     */
-    _formatDate(isoString) {
-        try {
-            const d = new Date(isoString);
-            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) +
-                ' at ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-        } catch {
-            return isoString;
-        }
-    }
-
-    /**
-     * Update badge counts on sidebar tabs
-     */
-    _updateTabBadges() {
-        if (!this.bookData) return;
-        const bid = this.bookData.bookId;
-        const counts = {
-            bookmarks: this.bookmarks.filter(b => b.bookId === bid).length,
-            highlights: this.highlights.filter(h => h.bookId === bid).length,
-            notes: this.notes.filter(n => n.bookId === bid).length
-        };
-        document.querySelectorAll('.panel-tab').forEach(tab => {
-            const name = tab.dataset.tab;
-            const count = counts[name];
-            let badge = tab.querySelector('.tab-badge');
-            if (count > 0) {
-                if (!badge) {
-                    badge = document.createElement('span');
-                    badge.className = 'tab-badge';
-                    tab.appendChild(badge);
-                }
-                badge.textContent = count;
-            } else if (badge) {
-                badge.remove();
-            }
-        });
-    }
 
     /**
      * Format time in M:SS or H:MM:SS
