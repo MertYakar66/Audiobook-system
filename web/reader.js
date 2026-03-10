@@ -1181,7 +1181,7 @@ class ReadAlongReader {
             this.highlightCurrentSentence(entry.start);
 
             if (wasPlaying) {
-                this.audio.play();
+                this.audio.play().catch(e => console.warn('Seek play failed:', e));
             }
         };
 
@@ -1290,7 +1290,19 @@ class ReadAlongReader {
      */
     togglePlay() {
         if (this.audio.paused) {
-            this.audio.play();
+            const playPromise = this.audio.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(error => {
+                    console.error('Play failed:', error);
+                    if (error.name === 'NotAllowedError') {
+                        this.showToast('Tap play again to start audio');
+                    } else if (error.name === 'NotSupportedError') {
+                        this.showToast('Audio file could not be loaded');
+                    } else {
+                        this.showToast('Audio playback error — check your connection');
+                    }
+                });
+            }
         } else {
             this.audio.pause();
         }
