@@ -32,11 +32,11 @@ COMPRESSIBLE_TYPES = {
 CACHE_RULES = {
     "audio/mpeg": 86400 * 7,     # Audio: 7 days
     "audio/wav": 86400 * 7,
-    "application/json": 3600,     # JSON: 1 hour
+    "application/json": 0,        # JSON: no cache (dev)
     "text/html": 0,               # HTML: no cache
-    "text/css": 3600,             # CSS: 1 hour
-    "text/javascript": 3600,      # JS: 1 hour
-    "application/javascript": 3600,
+    "text/css": 0,                # CSS: no cache (dev)
+    "text/javascript": 0,         # JS: no cache (dev)
+    "application/javascript": 0,
     "image/jpeg": 86400 * 7,     # Images: 7 days
     "image/png": 86400 * 7,
     "image/webp": 86400 * 7,

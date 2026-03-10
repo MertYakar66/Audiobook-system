@@ -26,6 +26,7 @@ const READ_ONLY_BOOKS = [
         id: "the-intelligent-investor-text",
         title: "The Intelligent Investor",
         author: "Benjamin Graham",
+        cover: "../input/intelligentcover.jpg",
         sourceFile: "../input/DOCXs/The Intelligent Investor.docx",
         addedDate: "2025-02-05"
     }

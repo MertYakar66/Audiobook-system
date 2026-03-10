@@ -19,12 +19,19 @@ const BOOK_SOURCES = {
     }
 };
 
+// Map Read Only IDs to their canonical Read & Listen IDs
+// so that progress, notes, and highlights are shared between modes.
+const CANONICAL_BOOK_IDS = {
+    "the-intelligent-investor-text": "the-intelligent-investor"
+};
+
 // PDF.js worker
 const PDFJS_CDN = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379";
 
 class PDFReader {
     constructor() {
         this.bookId = null;
+        this.canonicalBookId = null; // Shared ID for cross-reader data sync
         this.bookInfo = null;
         this.pdfDoc = null;
         this.totalPages = 0;
@@ -45,6 +52,9 @@ class PDFReader {
             this.showError('Book not found.');
             return;
         }
+
+        // Use canonical book ID for shared data (progress, notes, highlights)
+        this.canonicalBookId = CANONICAL_BOOK_IDS[this.bookId] || this.bookId;
 
         this.bookInfo = BOOK_SOURCES[this.bookId];
         document.getElementById('book-title').textContent = this.bookInfo.title;
@@ -236,21 +246,21 @@ class PDFReader {
     // ==================== PROGRESS (shared with Read & Listen) ====================
 
     saveProgress() {
-        // Map page to approximate chapter for Read & Listen compatibility
-        // Store page number in position field for precise restore
+        // Save under canonical book ID so Read & Listen can see our progress
         const progress = {
-            bookId: this.bookId,
+            bookId: this.canonicalBookId,
             chapter: 0,
             position: 0,
             page: this.currentPage,
             updatedAt: Date.now()
         };
-        localStorage.setItem(`readalong-progress-${this.bookId}`, JSON.stringify(progress));
+        localStorage.setItem(`readalong-progress-${this.canonicalBookId}`, JSON.stringify(progress));
     }
 
     restoreProgress() {
         try {
-            const saved = localStorage.getItem(`readalong-progress-${this.bookId}`);
+            // Read from canonical ID so we pick up Read & Listen progress too
+            const saved = localStorage.getItem(`readalong-progress-${this.canonicalBookId}`);
             if (saved) {
                 const progress = JSON.parse(saved);
                 if (Date.now() - progress.updatedAt < 30 * 24 * 60 * 60 * 1000) {
