@@ -55,7 +55,6 @@ class ReadAlongReader {
 
         // Performance: throttle/debounce timers
         this._saveProgressTimer = null;
-        this._lastHighlightUpdate = 0;
 
         // Dragging state for progress bar
         this.isDragging = false;
@@ -328,9 +327,12 @@ class ReadAlongReader {
     /**
      * Add highlight from toolbar
      */
-    addHighlightFromToolbar() {
-        if (!this.selectedSentenceId || !this.bookData) return;
-
+    /**
+     * Core highlight creation — shared by toolbar, player button, and notes modal
+     */
+    _createHighlight(sentenceId, text, color) {
+        if (!sentenceId || !this.bookData) return null;
+        color = color || this.selectedHighlightColor || 'yellow';
         const chapter = this.timingData?.chapters?.[this.currentChapter];
         const highlight = {
             id: Date.now().toString(),
@@ -338,28 +340,30 @@ class ReadAlongReader {
             chapter: this.currentChapter,
             chapterTitle: chapter?.title || `Chapter ${this.currentChapter + 1}`,
             audioTime: this.audio?.currentTime || 0,
-            sentenceId: this.selectedSentenceId,
-            text: this.selectedText,
-            color: this.selectedHighlightColor,
+            sentenceId,
+            text,
+            color,
             createdAt: new Date().toISOString()
         };
-
         this.highlights.push(highlight);
         this.saveBookData();
-        this.hideSelectionToolbar();
         this.renderHighlights();
 
-        // Apply highlight style
-        const el = document.querySelector(`[data-id="${this.selectedSentenceId}"]`);
+        // Apply highlight style to DOM
+        const el = document.querySelector(`[data-id="${sentenceId}"]`);
         if (el) {
             el.classList.add('highlighted');
-            el.dataset.highlightColor = this.selectedHighlightColor;
-            const colorObj = this.highlightColors.find(c => c.name === this.selectedHighlightColor);
-            if (colorObj) {
-                el.style.backgroundColor = colorObj.color;
-            }
+            el.dataset.highlightColor = color;
+            const colorObj = this.highlightColors.find(c => c.name === color);
+            if (colorObj) el.style.backgroundColor = colorObj.color;
         }
+        return highlight;
+    }
 
+    addHighlightFromToolbar() {
+        if (!this.selectedSentenceId || !this.bookData) return;
+        this._createHighlight(this.selectedSentenceId, this.selectedText, this.selectedHighlightColor);
+        this.hideSelectionToolbar();
         window.getSelection().removeAllRanges();
         this.showToast(`Highlighted in ${this.selectedHighlightColor}`);
     }
@@ -567,18 +571,6 @@ class ReadAlongReader {
             this.autoScroll = e.target.checked;
             this.saveSettings();
         });
-
-        // Book selection (if elements exist - for backwards compatibility)
-        const selectBookBtn = document.getElementById('select-book-btn');
-        const folderInput = document.getElementById('folder-input');
-        if (selectBookBtn && folderInput) {
-            selectBookBtn.addEventListener('click', () => {
-                folderInput.click();
-            });
-            folderInput.addEventListener('change', (e) => {
-                this.handleFolderSelect(e.target.files);
-            });
-        }
 
         // Bookmarks panel
         document.getElementById('menu-btn').addEventListener('click', () => {
@@ -1034,22 +1026,29 @@ class ReadAlongReader {
 
         const entries = chapter.entries;
 
-        // Find current sentence by scanning entries
+        // Binary search for current sentence (O(log n) instead of O(n))
         let currentIndex = -1;
-        for (let i = 0; i < entries.length; i++) {
-            if (currentTime >= entries[i].start && currentTime < entries[i].end) {
-                currentIndex = i;
-                break;
-            }
-            if (currentTime < entries[i].start) {
-                currentIndex = i > 0 ? i - 1 : 0;
+        let lo = 0, hi = entries.length - 1;
+        while (lo <= hi) {
+            const mid = (lo + hi) >> 1;
+            if (currentTime < entries[mid].start) {
+                hi = mid - 1;
+            } else if (currentTime >= entries[mid].end) {
+                lo = mid + 1;
+            } else {
+                currentIndex = mid;
                 break;
             }
         }
-
-        // Handle end of chapter
-        if (currentIndex === -1 && entries.length > 0 && currentTime >= entries[entries.length - 1].start) {
-            currentIndex = entries.length - 1;
+        // If not inside any entry, pick the closest preceding one
+        if (currentIndex === -1 && entries.length > 0) {
+            if (currentTime >= entries[entries.length - 1].start) {
+                currentIndex = entries.length - 1;
+            } else if (hi >= 0) {
+                currentIndex = hi;
+            } else {
+                currentIndex = 0;
+            }
         }
 
         // Update highlighting only if sentence changed
@@ -1550,38 +1549,10 @@ class ReadAlongReader {
             this.showToast('Play audio first to select a sentence');
             return;
         }
-        if (!this.bookData) return;
-
-        const chapter = this.timingData.chapters[this.currentChapter];
-        const highlight = {
-            id: Date.now().toString(),
-            bookId: this.bookData.bookId,
-            chapter: this.currentChapter,
-            chapterTitle: info.chapterTitle,
-            audioTime: this.audio?.currentTime || 0,
-            sentenceId: info.id,
-            text: info.text,
-            color: this.selectedHighlightColor || 'yellow',
-            createdAt: new Date().toISOString()
-        };
-
-        this.highlights.push(highlight);
-        this.saveBookData();
-        this.renderHighlights();
-
-        // Apply highlight style to DOM
-        const el = document.querySelector(`[data-id="${info.id}"]`);
-        if (el) {
-            el.classList.add('highlighted');
-            el.dataset.highlightColor = highlight.color;
-            const colorObj = this.highlightColors.find(c => c.name === highlight.color);
-            if (colorObj) {
-                el.style.backgroundColor = colorObj.color;
-            }
-        }
-
+        const color = this.selectedHighlightColor || 'yellow';
+        this._createHighlight(info.id, info.text, color);
         this.flashButton('highlight-btn');
-        this.showToast(`Highlighted in ${highlight.color}`);
+        this.showToast(`Highlighted in ${color}`);
     }
 
     /**
@@ -1797,33 +1768,8 @@ class ReadAlongReader {
      */
     addHighlight() {
         if (!this.selectedSentenceId || !this.bookData) return;
-
-        const highlight = {
-            id: Date.now().toString(),
-            bookId: this.bookData.bookId,
-            chapter: this.currentChapter,
-            sentenceId: this.selectedSentenceId,
-            text: this.selectedText,
-            color: this.selectedHighlightColor,
-            createdAt: new Date().toISOString()
-        };
-
-        this.highlights.push(highlight);
-        this.saveBookData();
+        this._createHighlight(this.selectedSentenceId, this.selectedText, this.selectedHighlightColor);
         this.closeNotesModal();
-        this.renderHighlights();
-
-        // Update sentence styling with color
-        const el = document.querySelector(`[data-id="${this.selectedSentenceId}"]`);
-        if (el) {
-            el.classList.add('highlighted');
-            el.dataset.highlightColor = this.selectedHighlightColor;
-            const colorObj = this.highlightColors.find(c => c.name === this.selectedHighlightColor);
-            if (colorObj) {
-                el.style.backgroundColor = colorObj.color;
-            }
-        }
-
         this.showToast(`Highlighted in ${this.selectedHighlightColor}`);
     }
 
@@ -2285,7 +2231,6 @@ class ReadAlongReader {
             if (response.ok) {
                 this.pagesData = await response.json();
                 this.totalPages = this.pagesData.totalPages || 0;
-                this.basePath = basePath;
 
                 // Build page files map
                 if (this.pagesData.pages) {

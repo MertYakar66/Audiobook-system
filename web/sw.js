@@ -6,7 +6,7 @@
  * - Audio files (cached on-demand)
  */
 
-const STATIC_CACHE = 'scriptum-static-v5';
+const STATIC_CACHE = 'scriptum-static-v8';
 const AUDIO_CACHE = 'scriptum-audio-v1';
 
 // Static files to cache on install (paths relative to /web/ scope)
