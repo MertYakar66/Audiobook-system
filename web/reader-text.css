@@ -11,7 +11,32 @@
     --header-height: 48px;
     --controls-height: 52px;
     --page-gap: 12px;
+    --hover-bg: rgba(255, 255, 255, 0.08);
     --page-shadow: 0 2px 20px rgba(0, 0, 0, 0.5);
+}
+
+/* Light theme */
+[data-theme="light"] {
+    --bg: #f8f9fc;
+    --bg-header: #eef0f5;
+    --bg-controls: #eef0f5;
+    --text: #1a1a2e;
+    --text-dim: #5a5a72;
+    --border: #d8dae5;
+    --hover-bg: rgba(0, 0, 0, 0.06);
+    --page-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* Sepia theme */
+[data-theme="sepia"] {
+    --bg: #f4ecd8;
+    --bg-header: #efe4d0;
+    --bg-controls: #efe4d0;
+    --text: #5c4a32;
+    --text-dim: #8b7355;
+    --border: #d4c5a9;
+    --hover-bg: rgba(0, 0, 0, 0.06);
+    --page-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
 }
 
 *, *::before, *::after {
@@ -72,7 +97,7 @@ body {
 }
 
 .header-btn:hover {
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--hover-bg);
     color: var(--text);
 }
 
@@ -91,7 +116,7 @@ body {
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
     padding: 4px 10px;
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--hover-bg);
     border-radius: 6px;
 }
 
@@ -157,7 +182,7 @@ body {
 }
 
 .ctrl-btn:hover {
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--hover-bg);
     color: var(--text);
 }
 

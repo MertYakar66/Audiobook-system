@@ -6,334 +6,335 @@
   "cover": "../../input/intelligentcover.jpg",
   "timing": "timing.json",
   "text": "text.json",
-  "totalDuration": 0,
+  "totalDuration": 74371.11,
   "chapterCount": 46,
   "chapters": [
     {
       "id": "ch00",
       "title": "Preface to the Fourth Edition, by Warren E. Buffett",
       "audioFile": "audio/ch01.mp3",
-      "duration": 0,
+      "duration": 263.69,
       "sentenceCount": 37
     },
     {
       "id": "ch01",
       "title": "A Note About Benjamin Graham by Jason Zweig",
       "audioFile": "audio/ch02.mp3",
-      "duration": 0,
+      "duration": 447.16,
       "sentenceCount": 58
     },
     {
       "id": "ch02",
       "title": "What This Book Expects to Accomplish",
       "audioFile": "audio/ch03.mp3",
-      "duration": 0,
+      "duration": 1277.8,
       "sentenceCount": 140
     },
     {
       "id": "ch03",
       "title": "COMMENTARY ON THE INTRODUCTION",
       "audioFile": "audio/ch04.mp3",
-      "duration": 0,
+      "duration": 816.1,
       "sentenceCount": 104
     },
     {
       "id": "ch04",
       "title": "Investment versus Speculation: Results to Be Expected by the Intelligent Investor",
       "audioFile": "audio/ch05.mp3",
-      "duration": 0,
+      "duration": 2334.81,
       "sentenceCount": 251
     },
     {
       "id": "ch05",
       "title": "COMMENTARY ON CHAPTER 1",
       "audioFile": "audio/ch06.mp3",
-      "duration": 0,
+      "duration": 1553.96,
       "sentenceCount": 212
     },
     {
       "id": "ch06",
       "title": "The Investor and Inflation",
       "audioFile": "audio/ch07.mp3",
-      "duration": 0,
+      "duration": 1400.08,
       "sentenceCount": 161
     },
     {
       "id": "ch07",
       "title": "COMMENTARY ON CHAPTER 2",
       "audioFile": "audio/ch08.mp3",
-      "duration": 0,
+      "duration": 873.87,
       "sentenceCount": 103
     },
     {
       "id": "ch08",
       "title": "A Century of Stock-Market History: The Level of Stock Prices in Early 1972",
       "audioFile": "audio/ch09.mp3",
-      "duration": 0,
+      "duration": 1752.29,
       "sentenceCount": 225
     },
     {
       "id": "ch09",
       "title": "COMMENTARY ON CHAPTER 3",
       "audioFile": "audio/ch10.mp3",
-      "duration": 0,
+      "duration": 1033.46,
       "sentenceCount": 132
     },
     {
       "id": "ch10",
       "title": "General Portfolio Policy:",
       "audioFile": "audio/ch11.mp3",
-      "duration": 0,
+      "duration": 1831.82,
       "sentenceCount": 209
     },
     {
       "id": "ch11",
       "title": "COMMENTARY ON CHAPTER 4",
       "audioFile": "audio/ch12.mp3",
-      "duration": 0,
+      "duration": 1477.27,
       "sentenceCount": 193
     },
     {
       "id": "ch12",
       "title": "The Defensive Investor and Common Stocks",
       "audioFile": "audio/ch13.mp3",
-      "duration": 0,
+      "duration": 1649.76,
       "sentenceCount": 186
     },
     {
       "id": "ch13",
       "title": "COMMENTARY ON CHAPTER 5",
       "audioFile": "audio/ch14.mp3",
-      "duration": 0,
+      "duration": 1240.62,
       "sentenceCount": 151
     },
     {
       "id": "ch14",
       "title": "Portfolio Policy for the Enterprising Investor: Negative Approach",
       "audioFile": "audio/ch15.mp3",
-      "duration": 0,
+      "duration": 1686.25,
       "sentenceCount": 181
     },
     {
       "id": "ch15",
       "title": "COMMENTARY ON CHAPTER 6",
       "audioFile": "audio/ch16.mp3",
-      "duration": 0,
+      "duration": 1233.42,
       "sentenceCount": 167
     },
     {
       "id": "ch16",
       "title": "Portfolio Policy for the Enterprising Investor: The Positive Side",
       "audioFile": "audio/ch17.mp3",
-      "duration": 0,
+      "duration": 3199.83,
       "sentenceCount": 368
     },
     {
       "id": "ch17",
       "title": "COMMENTARY ON CHAPTER 7",
       "audioFile": "audio/ch18.mp3",
-      "duration": 0,
+      "duration": 1166.84,
       "sentenceCount": 153
     },
     {
       "id": "ch18",
       "title": "The Investor and Market Fluctuations",
       "audioFile": "audio/ch19.mp3",
-      "duration": 0,
+      "duration": 3455.64,
       "sentenceCount": 414
     },
     {
       "id": "ch19",
       "title": "COMMENTARY ON CHAPTER 8",
       "audioFile": "audio/ch20.mp3",
-      "duration": 0,
+      "duration": 1797.75,
       "sentenceCount": 245
     },
     {
       "id": "ch20",
       "title": "Investing in Investment Funds",
       "audioFile": "audio/ch21.mp3",
-      "duration": 0,
+      "duration": 2027.23,
       "sentenceCount": 239
     },
     {
       "id": "ch21",
       "title": "COMMENTARY ON CHAPTER 9",
       "audioFile": "audio/ch22.mp3",
-      "duration": 0,
+      "duration": 1908.21,
       "sentenceCount": 237
     },
     {
       "id": "ch22",
       "title": "The Investor and His Advisers",
       "audioFile": "audio/ch23.mp3",
-      "duration": 0,
+      "duration": 2107.13,
       "sentenceCount": 239
     },
     {
       "id": "ch23",
       "title": "COMMENTARY ON CHAPTER 10",
       "audioFile": "audio/ch24.mp3",
-      "duration": 0,
+      "duration": 1034.23,
       "sentenceCount": 158
     },
     {
       "id": "ch24",
       "title": "Security Analysis for the Lay Investor: General Approach",
       "audioFile": "audio/ch25.mp3",
-      "duration": 0,
+      "duration": 2647.8,
       "sentenceCount": 304
     },
     {
       "id": "ch25",
       "title": "COMMENTARY ON CHAPTER 11",
       "audioFile": "audio/ch26.mp3",
-      "duration": 0,
+      "duration": 1113.58,
       "sentenceCount": 144
     },
     {
       "id": "ch26",
       "title": "Things to Consider About Per-Share Earnings",
       "audioFile": "audio/ch27.mp3",
-      "duration": 0,
+      "duration": 1683.1,
       "sentenceCount": 194
     },
     {
       "id": "ch27",
       "title": "COMMENTARY ON CHAPTER 12",
       "audioFile": "audio/ch28.mp3",
-      "duration": 0,
+      "duration": 1105.56,
       "sentenceCount": 132
     },
     {
       "id": "ch28",
       "title": "A Comparison of Four Listed Companies",
       "audioFile": "audio/ch29.mp3",
-      "duration": 0,
+      "duration": 1031.46,
       "sentenceCount": 124
     },
     {
       "id": "ch29",
       "title": "COMMENTARY ON CHAPTER 13",
       "audioFile": "audio/ch30.mp3",
-      "duration": 0,
+      "duration": 1062.12,
       "sentenceCount": 133
     },
     {
       "id": "ch30",
       "title": "Stock Selection for the Defensive Investor",
       "audioFile": "audio/ch31.mp3",
-      "duration": 0,
+      "duration": 1861.18,
       "sentenceCount": 226
     },
     {
       "id": "ch31",
       "title": "COMMENTARY ON CHAPTER 14",
       "audioFile": "audio/ch32.mp3",
-      "duration": 0,
+      "duration": 906.64,
       "sentenceCount": 112
     },
     {
       "id": "ch32",
       "title": "Stock Selection for the Enterprising Investor",
       "audioFile": "audio/ch33.mp3",
-      "duration": 0,
+      "duration": 2785.7,
       "sentenceCount": 320
     },
     {
       "id": "ch33",
       "title": "COMMENTARY ON CHAPTER 15",
       "audioFile": "audio/ch34.mp3",
-      "duration": 0,
+      "duration": 808.55,
       "sentenceCount": 95
     },
     {
       "id": "ch34",
       "title": "Convertible Issues and Warrants",
       "audioFile": "audio/ch35.mp3",
-      "duration": 0,
+      "duration": 2067.89,
       "sentenceCount": 268
     },
     {
       "id": "ch35",
       "title": "COMMENTARY ON CHAPTER 16",
       "audioFile": "audio/ch36.mp3",
-      "duration": 0,
+      "duration": 546.15,
       "sentenceCount": 67
     },
     {
       "id": "ch36",
       "title": "Four Extremely Instructive Case Histories",
       "audioFile": "audio/ch37.mp3",
-      "duration": 0,
+      "duration": 2350.82,
       "sentenceCount": 266
     },
     {
       "id": "ch37",
       "title": "COMMENTARY ON CHAPTER 17",
       "audioFile": "audio/ch38.mp3",
-      "duration": 0,
+      "duration": 937.5,
       "sentenceCount": 126
     },
     {
       "id": "ch38",
       "title": "A Comparison of Eight Pairs of Companies",
       "audioFile": "audio/ch39.mp3",
-      "duration": 0,
+      "duration": 2924.73,
       "sentenceCount": 370
     },
     {
       "id": "ch39",
       "title": "COMMENTARY ON CHAPTER 18",
       "audioFile": "audio/ch40.mp3",
-      "duration": 0,
+      "duration": 2030.62,
       "sentenceCount": 285
     },
     {
       "id": "ch40",
       "title": "Shareholders and Managements: Dividend Policy",
       "audioFile": "audio/ch41.mp3",
-      "duration": 0,
+      "duration": 1339.09,
       "sentenceCount": 145
     },
     {
       "id": "ch41",
       "title": "COMMENTARY ON CHAPTER 19",
       "audioFile": "audio/ch42.mp3",
-      "duration": 0,
+      "duration": 2054.12,
       "sentenceCount": 260
     },
     {
       "id": "ch42",
       "title": "“Margin of Safety” as the Central Concept of Investment",
       "audioFile": "audio/ch43.mp3",
-      "duration": 0,
+      "duration": 1781.37,
       "sentenceCount": 197
     },
     {
       "id": "ch43",
       "title": "COMMENTARY ON CHAPTER 20",
       "audioFile": "audio/ch44.mp3",
-      "duration": 0,
+      "duration": 747.32,
       "sentenceCount": 111
     },
     {
       "id": "ch44",
       "title": "Postscript",
       "audioFile": "audio/ch45.mp3",
-      "duration": 0,
+      "duration": 518.77,
       "sentenceCount": 78
     },
     {
       "id": "ch45",
       "title": "Appendixes",
       "audioFile": "audio/ch46.mp3",
-      "duration": 0,
+      "duration": 4497.81,
       "sentenceCount": 600
     }
   ],
   "generated": {
     "tts_engine": "edge-tts",
-    "timestamp": "2025-02-05T00:00:00"
+    "voice": "en-US-GuyNeural",
+    "timestamp": "2026-03-10T00:06:29"
   }
 }

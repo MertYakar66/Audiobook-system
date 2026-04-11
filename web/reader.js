@@ -55,7 +55,6 @@ class ReadAlongReader {
 
         // Performance: throttle/debounce timers
         this._saveProgressTimer = null;
-        this._lastHighlightUpdate = 0;
 
         // Dragging state for progress bar
         this.isDragging = false;
@@ -328,9 +327,12 @@ class ReadAlongReader {
     /**
      * Add highlight from toolbar
      */
-    addHighlightFromToolbar() {
-        if (!this.selectedSentenceId || !this.bookData) return;
-
+    /**
+     * Core highlight creation — shared by toolbar, player button, and notes modal
+     */
+    _createHighlight(sentenceId, text, color) {
+        if (!sentenceId || !this.bookData) return null;
+        color = color || this.selectedHighlightColor || 'yellow';
         const chapter = this.timingData?.chapters?.[this.currentChapter];
         const highlight = {
             id: Date.now().toString(),
@@ -338,28 +340,30 @@ class ReadAlongReader {
             chapter: this.currentChapter,
             chapterTitle: chapter?.title || `Chapter ${this.currentChapter + 1}`,
             audioTime: this.audio?.currentTime || 0,
-            sentenceId: this.selectedSentenceId,
-            text: this.selectedText,
-            color: this.selectedHighlightColor,
+            sentenceId,
+            text,
+            color,
             createdAt: new Date().toISOString()
         };
-
         this.highlights.push(highlight);
         this.saveBookData();
-        this.hideSelectionToolbar();
         this.renderHighlights();
 
-        // Apply highlight style
-        const el = document.querySelector(`[data-id="${this.selectedSentenceId}"]`);
+        // Apply highlight style to DOM
+        const el = document.querySelector(`[data-id="${sentenceId}"]`);
         if (el) {
             el.classList.add('highlighted');
-            el.dataset.highlightColor = this.selectedHighlightColor;
-            const colorObj = this.highlightColors.find(c => c.name === this.selectedHighlightColor);
-            if (colorObj) {
-                el.style.backgroundColor = colorObj.color;
-            }
+            el.dataset.highlightColor = color;
+            const colorObj = this.highlightColors.find(c => c.name === color);
+            if (colorObj) el.style.backgroundColor = colorObj.color;
         }
+        return highlight;
+    }
 
+    addHighlightFromToolbar() {
+        if (!this.selectedSentenceId || !this.bookData) return;
+        this._createHighlight(this.selectedSentenceId, this.selectedText, this.selectedHighlightColor);
+        this.hideSelectionToolbar();
         window.getSelection().removeAllRanges();
         this.showToast(`Highlighted in ${this.selectedHighlightColor}`);
     }
@@ -568,18 +572,6 @@ class ReadAlongReader {
             this.saveSettings();
         });
 
-        // Book selection (if elements exist - for backwards compatibility)
-        const selectBookBtn = document.getElementById('select-book-btn');
-        const folderInput = document.getElementById('folder-input');
-        if (selectBookBtn && folderInput) {
-            selectBookBtn.addEventListener('click', () => {
-                folderInput.click();
-            });
-            folderInput.addEventListener('change', (e) => {
-                this.handleFolderSelect(e.target.files);
-            });
-        }
-
         // Bookmarks panel
         document.getElementById('menu-btn').addEventListener('click', () => {
             document.getElementById('bookmarks-panel').classList.toggle('open');
@@ -609,7 +601,13 @@ class ReadAlongReader {
             this.exportNotesAndHighlights();
         });
 
-        // Add bookmark button
+        // Player action buttons: Highlight, Note, Save
+        document.getElementById('highlight-btn').addEventListener('click', () => {
+            this.highlightActiveSentence();
+        });
+        document.getElementById('note-btn').addEventListener('click', () => {
+            this.noteCurrentSentence();
+        });
         document.getElementById('bookmark-btn').addEventListener('click', () => {
             this.addBookmark();
         });
@@ -1028,22 +1026,29 @@ class ReadAlongReader {
 
         const entries = chapter.entries;
 
-        // Find current sentence by scanning entries
+        // Binary search for current sentence (O(log n) instead of O(n))
         let currentIndex = -1;
-        for (let i = 0; i < entries.length; i++) {
-            if (currentTime >= entries[i].start && currentTime < entries[i].end) {
-                currentIndex = i;
-                break;
-            }
-            if (currentTime < entries[i].start) {
-                currentIndex = i > 0 ? i - 1 : 0;
+        let lo = 0, hi = entries.length - 1;
+        while (lo <= hi) {
+            const mid = (lo + hi) >> 1;
+            if (currentTime < entries[mid].start) {
+                hi = mid - 1;
+            } else if (currentTime >= entries[mid].end) {
+                lo = mid + 1;
+            } else {
+                currentIndex = mid;
                 break;
             }
         }
-
-        // Handle end of chapter
-        if (currentIndex === -1 && entries.length > 0 && currentTime >= entries[entries.length - 1].start) {
-            currentIndex = entries.length - 1;
+        // If not inside any entry, pick the closest preceding one
+        if (currentIndex === -1 && entries.length > 0) {
+            if (currentTime >= entries[entries.length - 1].start) {
+                currentIndex = entries.length - 1;
+            } else if (hi >= 0) {
+                currentIndex = hi;
+            } else {
+                currentIndex = 0;
+            }
         }
 
         // Update highlighting only if sentence changed
@@ -1175,7 +1180,7 @@ class ReadAlongReader {
             this.highlightCurrentSentence(entry.start);
 
             if (wasPlaying) {
-                this.audio.play();
+                this.audio.play().catch(e => console.warn('Seek play failed:', e));
             }
         };
 
@@ -1284,7 +1289,19 @@ class ReadAlongReader {
      */
     togglePlay() {
         if (this.audio.paused) {
-            this.audio.play();
+            const playPromise = this.audio.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(error => {
+                    console.error('Play failed:', error);
+                    if (error.name === 'NotAllowedError') {
+                        this.showToast('Tap play again to start audio');
+                    } else if (error.name === 'NotSupportedError') {
+                        this.showToast('Audio file could not be loaded');
+                    } else {
+                        this.showToast('Audio playback error — check your connection');
+                    }
+                });
+            }
         } else {
             this.audio.pause();
         }
@@ -1482,7 +1499,78 @@ class ReadAlongReader {
             case 'KeyP':
                 this.togglePageView();
                 break;
+            case 'KeyH':
+                this.highlightActiveSentence();
+                break;
+            case 'KeyN':
+                this.noteCurrentSentence();
+                break;
         }
+    }
+
+    // ==================== PLAYER ACTION BUTTONS ====================
+
+    /**
+     * Get the current active sentence info (used by player action buttons)
+     */
+    getCurrentSentenceInfo() {
+        const chapter = this.timingData?.chapters?.[this.currentChapter];
+        if (!chapter || this.currentSentenceIndex < 0 || this.currentSentenceIndex >= chapter.entries.length) {
+            return null;
+        }
+        const entry = chapter.entries[this.currentSentenceIndex];
+        return {
+            id: entry.id || `s${this.currentChapter}-${this.currentSentenceIndex}`,
+            text: entry.text || '',
+            index: this.currentSentenceIndex,
+            chapterTitle: chapter.title || `Chapter ${this.currentChapter + 1}`
+        };
+    }
+
+    /**
+     * Flash an action button for visual feedback
+     */
+    flashButton(btnId) {
+        const btn = document.getElementById(btnId);
+        if (!btn) return;
+        btn.classList.remove('flash');
+        // Force reflow so re-adding the class triggers the animation
+        void btn.offsetWidth;
+        btn.classList.add('flash');
+        setTimeout(() => btn.classList.remove('flash'), 500);
+    }
+
+    /**
+     * Highlight the currently playing sentence (player button)
+     */
+    highlightActiveSentence() {
+        const info = this.getCurrentSentenceInfo();
+        if (!info) {
+            this.showToast('Play audio first to select a sentence');
+            return;
+        }
+        const color = this.selectedHighlightColor || 'yellow';
+        this._createHighlight(info.id, info.text, color);
+        this.flashButton('highlight-btn');
+        this.showToast(`Highlighted in ${color}`);
+    }
+
+    /**
+     * Open notes modal for the currently playing sentence (player button)
+     */
+    noteCurrentSentence() {
+        const info = this.getCurrentSentenceInfo();
+        if (!info) {
+            this.showToast('Play audio first to select a sentence');
+            return;
+        }
+
+        // Set the selection state so saveNote() can use it
+        this.selectedText = info.text;
+        this.selectedSentenceId = info.id;
+
+        this.flashButton('note-btn');
+        this.openNotesModal(info.text);
     }
 
     // ==================== BOOKMARKS ====================
@@ -1513,11 +1601,8 @@ class ReadAlongReader {
         this.updateBookmarkMarkers();
         this.showToast('Bookmark added');
 
-        // Flash the bookmark button
-        document.getElementById('bookmark-btn').classList.add('active');
-        setTimeout(() => {
-            document.getElementById('bookmark-btn').classList.remove('active');
-        }, 500);
+        // Flash the Save button
+        this.flashButton('bookmark-btn');
     }
 
     /**
@@ -1683,33 +1768,8 @@ class ReadAlongReader {
      */
     addHighlight() {
         if (!this.selectedSentenceId || !this.bookData) return;
-
-        const highlight = {
-            id: Date.now().toString(),
-            bookId: this.bookData.bookId,
-            chapter: this.currentChapter,
-            sentenceId: this.selectedSentenceId,
-            text: this.selectedText,
-            color: this.selectedHighlightColor,
-            createdAt: new Date().toISOString()
-        };
-
-        this.highlights.push(highlight);
-        this.saveBookData();
+        this._createHighlight(this.selectedSentenceId, this.selectedText, this.selectedHighlightColor);
         this.closeNotesModal();
-        this.renderHighlights();
-
-        // Update sentence styling with color
-        const el = document.querySelector(`[data-id="${this.selectedSentenceId}"]`);
-        if (el) {
-            el.classList.add('highlighted');
-            el.dataset.highlightColor = this.selectedHighlightColor;
-            const colorObj = this.highlightColors.find(c => c.name === this.selectedHighlightColor);
-            if (colorObj) {
-                el.style.backgroundColor = colorObj.color;
-            }
-        }
-
         this.showToast(`Highlighted in ${this.selectedHighlightColor}`);
     }
 
@@ -2171,7 +2231,6 @@ class ReadAlongReader {
             if (response.ok) {
                 this.pagesData = await response.json();
                 this.totalPages = this.pagesData.totalPages || 0;
-                this.basePath = basePath;
 
                 // Build page files map
                 if (this.pagesData.pages) {
