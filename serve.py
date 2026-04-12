@@ -149,12 +149,33 @@ class FastHTTPRequestHandler(SimpleHTTPRequestHandler):
             self.end_headers()
             return open(path, "rb")
 
+    def copyfile(self, source, outputfile):
+        """Swallow expected client disconnects (e.g. browser cancels range
+        requests during audio seeking, navigates away mid-transfer, or the
+        service worker races the network). These are harmless on Windows
+        they surface as ConnectionAbortedError / WinError 10053."""
+        try:
+            super().copyfile(source, outputfile)
+        except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError):
+            pass
+
     def log_message(self, format, *args):
         """Quieter logging - only show non-200 or slow requests."""
         # Still log everything but more concisely
         msg = format % args
         if "200" not in msg and "206" not in msg:
             sys.stderr.write(f"[{self.log_date_time_string()}] {msg}\n")
+
+
+class _QuietHTTPServer(HTTPServer):
+    """Suppress tracebacks for expected client disconnects."""
+
+    def handle_error(self, request, client_address):
+        import sys as _sys
+        exc_type = _sys.exc_info()[0]
+        if exc_type and issubclass(exc_type, (ConnectionAbortedError, ConnectionResetError, BrokenPipeError)):
+            return
+        super().handle_error(request, client_address)
 
 
 class _RangeFile:
@@ -179,7 +200,7 @@ class _RangeFile:
 
 def main():
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
-    server = HTTPServer(("", port), FastHTTPRequestHandler)
+    server = _QuietHTTPServer(("", port), FastHTTPRequestHandler)
     print(f"Serving at http://localhost:{port}")
     print(f"Open http://localhost:{port}/web/library.html")
     print(f"Gzip compression: ENABLED for JSON/HTML/CSS/JS")
