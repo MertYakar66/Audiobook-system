@@ -303,17 +303,7 @@ class ScriptumLibrary {
                 </div>
             `;
         }).join('');
-
-        // Click to open book at that chapter
-        list.querySelectorAll('.note-card').forEach(card => {
-            card.addEventListener('click', () => {
-                const bookId = card.dataset.bookId;
-                const book = this.findBookById(bookId);
-                if (book) {
-                    window.location.href = `reader.html?book=${bookId}`;
-                }
-            });
-        });
+        // Click handler is installed once in bindEvents() via delegation.
     }
 
     findBookById(bookId) {
@@ -435,6 +425,16 @@ class ScriptumLibrary {
         if (exportBtn) {
             exportBtn.addEventListener('click', () => this.exportAllNotes());
         }
+
+        // Note card navigation (delegated — rendered notes are replaced each view)
+        document.getElementById('notes-list').addEventListener('click', (e) => {
+            const card = e.target.closest('.note-card');
+            if (!card) return;
+            const bookId = card.dataset.bookId;
+            if (this.findBookById(bookId)) {
+                window.location.href = `reader.html?book=${bookId}`;
+            }
+        });
 
         // Close settings on outside click
         document.addEventListener('click', (e) => {
@@ -599,7 +599,6 @@ class ScriptumLibrary {
     // ==================== THEME ====================
 
     setTheme(theme) {
-        document.body.dataset.theme = theme === 'dark' ? '' : theme;
         if (theme === 'dark') {
             document.body.removeAttribute('data-theme');
         } else {

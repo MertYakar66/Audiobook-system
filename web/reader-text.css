@@ -264,29 +264,6 @@ body {
     margin-top: 8px;
 }
 
-/* ==================== TOAST ==================== */
-
-.toast {
-    position: fixed;
-    bottom: calc(var(--controls-height) + 16px);
-    left: 50%;
-    transform: translateX(-50%) translateY(60px);
-    background: var(--bg-header);
-    color: var(--text);
-    padding: 8px 18px;
-    border-radius: 8px;
-    font-size: 0.8125rem;
-    z-index: 300;
-    opacity: 0;
-    transition: all 0.25s ease;
-    border: 1px solid var(--border);
-}
-
-.toast.show {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-}
-
 /* ==================== RESPONSIVE ==================== */
 
 @media (max-width: 600px) {

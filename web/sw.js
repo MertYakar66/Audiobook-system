@@ -6,7 +6,7 @@
  * - Audio files (cached on-demand)
  */
 
-const STATIC_CACHE = 'scriptum-static-v8';
+const STATIC_CACHE = 'scriptum-static-v9';
 const AUDIO_CACHE = 'scriptum-audio-v1';
 
 // Static files to cache on install (paths relative to /web/ scope)
@@ -165,11 +165,11 @@ self.addEventListener('message', (event) => {
         const urls = event.data.urls;
         caches.open(AUDIO_CACHE).then((cache) => {
             urls.forEach((url) => {
-                fetch(url).then((response) => {
-                    if (response.ok) {
-                        cache.put(url, response);
-                    }
-                });
+                fetch(url)
+                    .then((response) => {
+                        if (response.ok) return cache.put(url, response);
+                    })
+                    .catch((err) => console.warn('[SW] Failed to pre-cache audio:', url, err));
             });
         });
     }
