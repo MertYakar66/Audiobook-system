@@ -1330,7 +1330,7 @@ class ReadAlongReader {
         // Auto-advance to next chapter
         if (this.currentChapter < this.timingData.chapters.length - 1) {
             this.loadChapter(this.currentChapter + 1);
-            this.audio.play();
+            this.audio.play().catch(e => console.warn('Auto-advance play failed:', e));
         }
     }
 
@@ -1626,7 +1626,7 @@ class ReadAlongReader {
             this.audio.currentTime = bookmark.time;
         }
         if (!this.isPlaying) {
-            this.audio.play();
+            this.audio.play().catch(e => console.warn('Bookmark play failed:', e));
         }
         document.getElementById('bookmarks-panel').classList.remove('open');
     }
@@ -1686,7 +1686,7 @@ class ReadAlongReader {
         const selection = window.getSelection();
         const text = selection.toString().trim();
 
-        if (text.length > 0) {
+        if (text.length > 0 && selection.rangeCount > 0) {
             // Find the sentence element
             let node = selection.anchorNode;
             while (node && !node.classList?.contains('sentence')) {
@@ -1696,10 +1696,10 @@ class ReadAlongReader {
             if (node && node.classList?.contains('sentence')) {
                 this.selectedText = text;
                 this.selectedSentenceId = node.dataset.id;
-                this.selectionRange = selection.getRangeAt(0).cloneRange();
+                const range = selection.getRangeAt(0);
+                this.selectionRange = range.cloneRange();
 
                 // Get position for toolbar
-                const range = selection.getRangeAt(0);
                 const rect = range.getBoundingClientRect();
                 const x = rect.left + rect.width / 2;
                 const y = rect.top + window.scrollY;
@@ -1814,22 +1814,34 @@ class ReadAlongReader {
         container.querySelectorAll('.note-item').forEach(item => {
             item.addEventListener('click', () => {
                 const note = this.notes.find(n => n.id === item.dataset.id);
-                if (note) {
-                    if (note.chapter !== this.currentChapter) {
-                        this.loadChapter(note.chapter);
-                    }
-                    setTimeout(() => {
-                        const el = document.querySelector(`[data-id="${note.sentenceId}"]`);
-                        if (el) {
-                            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                            el.classList.add('active');
-                            setTimeout(() => el.classList.remove('active'), 2000);
-                        }
-                    }, 500);
-                    document.getElementById('bookmarks-panel').classList.remove('open');
-                }
+                if (note) this._jumpToSentence(note.chapter, note.sentenceId, 'active', 2000);
             });
         });
+    }
+
+    /**
+     * Jump to a sentence (loads chapter if needed, scrolls, flashes highlight).
+     * Shared helper used by notes and highlights lists.
+     */
+    _jumpToSentence(chapter, sentenceId, flashClass = 'active', flashDuration = 2000) {
+        const doScroll = () => {
+            const targetChapter = this.currentChapter;
+            const el = document.querySelector(`[data-id="${sentenceId}"]`);
+            if (el && targetChapter === chapter) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                el.classList.add(flashClass);
+                setTimeout(() => el.classList.remove(flashClass), flashDuration);
+            }
+        };
+
+        if (chapter !== this.currentChapter) {
+            this.loadChapter(chapter);
+            // Wait for chapter to render before scrolling
+            setTimeout(doScroll, 500);
+        } else {
+            doScroll();
+        }
+        document.getElementById('bookmarks-panel').classList.remove('open');
     }
 
     /**
@@ -1863,20 +1875,7 @@ class ReadAlongReader {
         container.querySelectorAll('.highlight-item').forEach(item => {
             item.addEventListener('click', () => {
                 const highlight = this.highlights.find(h => h.id === item.dataset.id);
-                if (highlight) {
-                    if (highlight.chapter !== this.currentChapter) {
-                        this.loadChapter(highlight.chapter);
-                    }
-                    setTimeout(() => {
-                        const el = document.querySelector(`[data-id="${highlight.sentenceId}"]`);
-                        if (el) {
-                            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                            el.classList.add('flash');
-                            setTimeout(() => el.classList.remove('flash'), 1500);
-                        }
-                    }, 500);
-                    document.getElementById('bookmarks-panel').classList.remove('open');
-                }
+                if (highlight) this._jumpToSentence(highlight.chapter, highlight.sentenceId, 'flash', 1500);
             });
         });
     }

@@ -319,13 +319,6 @@ class PDFReader {
         document.getElementById('error-state').style.display = 'flex';
         document.getElementById('error-message').textContent = message;
     }
-
-    showToast(message) {
-        const toast = document.getElementById('toast');
-        toast.textContent = message;
-        toast.classList.add('show');
-        setTimeout(() => toast.classList.remove('show'), 3000);
-    }
 }
 
 // Initialize
